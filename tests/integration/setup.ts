@@ -44,7 +44,7 @@ export async function bootstrap() {
     userId: u.id, name: u.name, email: u.email, role, restaurantId, ip: "127.0.0.1",
   });
 
-  for (const n of [2, 3, 4, 5]) {
+  for (const n of [2, 3, 4, 5, 6, 7, 8, 9]) {
     await prisma.cashRegister.upsert({
       where: { restaurantId_name: { restaurantId, name: `Caixa ${n}` } },
       update: {},
