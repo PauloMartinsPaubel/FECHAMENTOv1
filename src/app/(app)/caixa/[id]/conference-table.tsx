@@ -14,6 +14,7 @@ export function ConferenceTable({
   cash: CashBreakdown;
   divergence: Pick<DivergenceSummary, "netCents" | "absCents" | "status" | "origins" | "hints">;
 }) {
+  lines = lines.filter((l) => l.expectedCents !== 0 || l.checkedCents !== null);
   const groups = [...new Set(lines.map((l) => l.group))];
   return (
     <div className="space-y-4">

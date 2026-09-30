@@ -28,7 +28,7 @@ export const REPORT_CSS = `
 .rpt td.n,.rpt th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .rpt tr.row td{border-bottom:1px dotted #d6d3d1}
 .rpt tr.total td{border-top:2px solid #1c1917;font-weight:700}
-.rpt tr.sub td{color:#57534e;font-size:13px}
+.rpt tr.subrow td{color:#57534e;font-size:13px}
 .rpt .neg{color:#b91c1c}.rpt .pos{color:#a16207}.rpt .ok{color:#15803d}
 .rpt .box{border:2px solid #1c1917;padding:10px 14px;margin:12px 0;border-radius:6px}
 .rpt .box.ok{border-color:#15803d;background:#f0fdf4}.rpt .box.bad{border-color:#b91c1c;background:#fef2f2}.rpt .box.warn{border-color:#a16207;background:#fefce8}
@@ -57,7 +57,7 @@ export function renderShiftReport(d: ShiftReportData, corrections: CorrectionLin
   const t = d.totals;
   const div = d.divergence;
   const cashLine = d.conference.find((l) => l.group === "CASH");
-  const byGroup = (g: string) => d.conference.filter((l) => l.group === g);
+  const byGroup = (g: string) => d.conference.filter((l) => l.group === g && (l.systemCents !== 0 || l.expectedCents !== 0 || l.checkedCents !== null));
   const sum = (list: typeof d.conference, f: "systemCents" | "expectedCents") => list.reduce((a, l) => a + l[f], 0);
   const sumChecked = (list: typeof d.conference) => list.reduce((a, l) => a + (l.checkedCents ?? 0), 0);
   const sumDiff = (list: typeof d.conference) => list.reduce((a, l) => a + (l.differenceCents ?? 0), 0);
@@ -85,7 +85,7 @@ export function renderShiftReport(d: ShiftReportData, corrections: CorrectionLin
   const matrixRows = d.matrix
     .map((c) => {
       const cells = c.cells
-        .map((x) => `<tr class="sub"><td>&nbsp;&nbsp;${esc(x.brandName ? `${x.methodName} / ${x.brandName}` : x.methodName)}</td>${money(x.netCents)}</tr>`)
+        .map((x) => `<tr class="subrow"><td>&nbsp;&nbsp;${esc(x.brandName ? `${x.methodName} / ${x.brandName}` : x.methodName)}</td>${money(x.netCents)}</tr>`)
         .join("");
       return `<tr class="row"><td><strong>${esc(c.channelName)}</strong></td><td class="n"><strong>${esc(formatBRL(c.totalCents))}</strong></td></tr>${cells}`;
     })
@@ -106,7 +106,7 @@ ${banner}
 
 <h2>Abertura</h2>
 <table>${row("Fundo inicial (não é faturamento)", d.floatCents)}
-<tr class="sub"><td colspan="2">${esc(FLOAT_MODE_LABEL[s.floatMode])}${s.transferredFromLabel ? `, vindo de ${esc(s.transferredFromLabel)}` : ""}</td></tr></table>
+<tr class="subrow"><td colspan="2">${esc(FLOAT_MODE_LABEL[s.floatMode])}${s.transferredFromLabel ? `, vindo de ${esc(s.transferredFromLabel)}` : ""}</td></tr></table>
 
 <h2>Vendas</h2>
 <table>
@@ -155,7 +155,7 @@ ${conferenceBlock("Conferência de outros", byGroup("OTHER"))}
 <table>
 <tr><td>Faturamento</td><td class="n big">${esc(formatBRL(t.revenueCents))}</td></tr>
 <tr><td>Fundo inicial</td>${money(d.floatCents)}</tr>
-<tr class="sub"><td>Valores controlados (faturamento + fundo)</td>${money(t.controlledCents)}</tr>
+<tr class="subrow"><td>Valores controlados (faturamento + fundo)</td>${money(t.controlledCents)}</tr>
 <tr><td>Divergência total</td>${diffCell(div.status === null ? null : div.netCents)}</tr>
 </table>
 <p class="big" style="margin:8px 0 0">Status: ${esc(statusText(div.status, div.netCents, div.absCents))}</p>
@@ -165,7 +165,7 @@ ${
   div.origins.length > 0
     ? `<h2>De onde veio a divergência</h2><table><tr><th>Origem</th><th class="n">Diferença</th></tr>${div.origins
         .map((o) => `<tr class="row"><td>${esc(o.label)}</td>${diffCell(o.differenceCents)}</tr>`)
-        .join("")}<tr class="total"><td>Divergência líquida</td>${diffCell(div.netCents)}</tr><tr class="sub"><td>Soma dos módulos</td>${money(div.absCents)}</tr></table>${
+        .join("")}<tr class="total"><td>Divergência líquida</td>${diffCell(div.netCents)}</tr><tr class="subrow"><td>Soma dos módulos</td>${money(div.absCents)}</tr></table>${
         div.hints.length
           ? `<p class="small"><strong>Pistas:</strong></p><ul class="small">${div.hints.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>`
           : ""
@@ -245,7 +245,7 @@ function shiftColumn(title: string, h: Headline, floatText: string): string {
   return `<div><table><tr><th colspan="2">${esc(title)}</th></tr>
 ${row("Faturamento", h.revenueCents)}${row("Dinheiro", h.cashSalesCents)}${row("Cartões", h.cardsCents)}${row("PIX", h.pixCents)}${row("Tickets", h.ticketsCents)}${row("Online", h.onlineCents)}${row("Outros", h.otherCents)}
 <tr class="row"><td>Divergência</td>${diffCell(h.divergenceNetCents)}</tr>
-<tr class="sub"><td colspan="2">${esc(floatText)}</td></tr></table></div>`;
+<tr class="subrow"><td colspan="2">${esc(floatText)}</td></tr></table></div>`;
 }
 
 /** Fechamento geral do dia: manhã, tarde/noite e total, sem duplicar fundo. */
@@ -271,8 +271,8 @@ ${c.shifts
 ${row("Faturamento total", t.revenueCents, "total")}
 ${row("Dinheiro total", t.cashSalesCents)}
 ${row("Cartões total", t.cardsCents)}
-${row("   Crédito", t.creditCents, "sub")}
-${row("   Débito", t.debitCents, "sub")}
+${row("   Crédito", t.creditCents, "subrow")}
+${row("   Débito", t.debitCents, "subrow")}
 ${row("PIX total", t.pixCents)}
 ${row("Tickets total", t.ticketsCents)}
 ${row("Online total", t.onlineCents)}
@@ -283,7 +283,7 @@ ${row("Sangrias", t.withdrawalsCents)}
 ${row("Suprimentos", t.suppliesCents)}
 ${row("Despesas", t.expensesCents)}
 <tr class="row"><td>Divergência líquida</td>${diffCell(t.divergenceNetCents)}</tr>
-<tr class="sub"><td>Soma dos módulos das diferenças</td>${money(t.divergenceAbsCents)}</tr>
+<tr class="subrow"><td>Soma dos módulos das diferenças</td>${money(t.divergenceAbsCents)}</tr>
 </table>
 
 <h2>Fundo de caixa</h2>
@@ -295,7 +295,7 @@ ${c.floatLines
   )
   .join("")}
 <tr class="total"><td>Fundo contado como entrada nova</td>${money(c.floatCents)}</tr>
-<tr class="sub"><td>Valores controlados (faturamento + fundo)</td>${money(c.controlledCents)}</tr>
+<tr class="subrow"><td>Valores controlados (faturamento + fundo)</td>${money(c.controlledCents)}</tr>
 </table>
 <p class="small">O fundo de caixa não é faturamento. Se o mesmo fundo passa de um turno para o outro, ele aparece nos dois turnos, mas entra uma vez só na soma.</p>
 
