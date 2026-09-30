@@ -43,6 +43,14 @@ export function assertEditable(actor: Actor, s: SessionAccessFields): EditMode {
   throw new ServiceError("Este caixa está fechado. Um gerente precisa reabri-lo, com motivo, para corrigir.", "STATE");
 }
 
+/** Modo de edição que o usuário tem neste caixa agora (null = só leitura). Usado para montar a tela. */
+export function editModeFor(actor: Actor, s: SessionAccessFields): EditMode | null {
+  if (!canAccessSession(actor, s)) return null;
+  if (s.status === "OPEN" && can(actor.role, "movement.write")) return "normal";
+  if (s.status === "REOPENED" && can(actor.role, "closing.correct")) return "correction";
+  return null;
+}
+
 export function requireReason(reason: string | null | undefined, what = "o motivo"): string {
   const r = (reason ?? "").trim();
   if (r.length < 3) throw new ServiceError(`Informe ${what} (mínimo de 3 letras).`);

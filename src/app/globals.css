@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-brand-50: #f0fdf4;
+  --color-brand-100: #dcfce7;
+  --color-brand-600: #15803d;
+  --color-brand-700: #166534;
+  --color-brand-900: #14532d;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body { @apply bg-stone-100 text-stone-900 antialiased; font-family: var(--font-sans); }
+
+@utility card { @apply rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5; }
+@utility card-title { @apply mb-3 text-sm font-semibold uppercase tracking-wide text-stone-600; }
+@utility label { @apply mb-1 block text-sm font-medium text-stone-700; }
+@utility input { @apply block w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/25 disabled:bg-stone-100 disabled:text-stone-500; }
+@utility input-money { @apply input text-right tabular-nums; }
+@utility btn { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50; }
+@utility btn-primary { @apply btn bg-brand-600 text-white hover:bg-brand-700 focus:ring-brand-600; }
+@utility btn-secondary { @apply btn border border-stone-300 bg-white text-stone-800 hover:bg-stone-50 focus:ring-stone-400; }
+@utility btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-600; }
+@utility btn-sm { @apply min-h-9! px-3! py-1.5! text-xs!; }
+@utility th { @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-stone-500; }
+@utility td { @apply px-3 py-2 align-top; }
+@utility num { @apply text-right tabular-nums whitespace-nowrap; }
+@utility badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold; }
+@utility link { @apply font-medium text-brand-700 underline-offset-2 hover:underline; }
+
+@media print {
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+}
+.print-only { display: none; }
