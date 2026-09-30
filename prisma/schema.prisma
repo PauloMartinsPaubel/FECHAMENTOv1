@@ -1,0 +1,560 @@
+// Sistema de caixa, conferência e fechamento para restaurante.
+// Todo valor monetário é Int em CENTAVOS. Nunca Float.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum RoleCode {
+  ADMIN
+  MANAGER
+  OPERATOR
+}
+
+enum PaymentKind {
+  CASH
+  CREDIT
+  DEBIT
+  PIX
+  TICKET
+  ONLINE
+  OTHER
+}
+
+enum MovementType {
+  VENDA
+  SUPRIMENTO
+  SANGRIA
+  DESPESA
+  ESTORNO
+  AJUSTE
+}
+
+/// ACTIVE conta nos cálculos. VOIDED = lançado por engano. CANCELLED = pedido cancelado. Nenhum é apagado.
+enum MovementStatus {
+  ACTIVE
+  VOIDED
+  CANCELLED
+}
+
+enum SessionStatus {
+  OPEN
+  CLOSED
+  REOPENED
+  CORRECTED
+}
+
+enum FloatMode {
+  NEW_OPENING
+  TRANSFER
+}
+
+enum ClosingStatus {
+  CORRETO
+  FALTA
+  SOBRA
+  MISTO
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model Restaurant {
+  id        String   @id @default(uuid())
+  name      String
+  document  String?
+  timezone  String   @default("America/Sao_Paulo")
+  createdAt DateTime @default(now())
+
+  users          User[]
+  registers      CashRegister[]
+  shifts         Shift[]
+  channels       SalesChannel[]
+  paymentMethods PaymentMethod[]
+  ticketBrands   TicketBrand[]
+  sessions       CashSession[]
+  movements      CashMovement[]
+  cancellations  Cancellation[]
+  closings       CashClosing[]
+  adjustments    Adjustment[]
+  auditLogs      AuditLog[]
+  emailLogs      EmailLog[]
+  settings       Setting?
+
+  @@map("restaurants")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  code        RoleCode @unique
+  name        String
+  description String
+  users       User[]
+
+  @@map("roles")
+}
+
+model User {
+  id                 String    @id @default(uuid())
+  restaurantId       String
+  roleId             String
+  name               String
+  email              String    @unique
+  passwordHash       String
+  active             Boolean   @default(true)
+  failedLogins       Int       @default(0)
+  lockedUntil        DateTime?
+  mustChangePassword Boolean   @default(false)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id])
+  role         Role          @relation(fields: [roleId], references: [id])
+  authSessions AuthSession[]
+
+  openedSessions  CashSession[]  @relation("SessionResponsible")
+  closedSessions  CashSession[]  @relation("SessionClosedBy")
+  movements       CashMovement[] @relation("MovementCreatedBy")
+  voidedMovements CashMovement[] @relation("MovementVoidedBy")
+  cancellations   Cancellation[]
+  closings        CashClosing[]
+  adjustments     Adjustment[]
+  auditLogs       AuditLog[]
+  emailLogs       EmailLog[]
+
+  @@index([restaurantId])
+  @@map("users")
+}
+
+model AuthSession {
+  id         String   @id @default(uuid())
+  userId     String
+  /// SHA-256 do token. O token em si só existe no cookie do usuário.
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  ip         String?
+  userAgent  String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_sessions")
+}
+
+model CashRegister {
+  id           String  @id @default(uuid())
+  restaurantId String
+  name         String
+  active       Boolean @default(true)
+  sortOrder    Int     @default(0)
+
+  restaurant Restaurant    @relation(fields: [restaurantId], references: [id])
+  sessions   CashSession[]
+
+  @@unique([restaurantId, name])
+  @@map("cash_registers")
+}
+
+model Shift {
+  id           String  @id @default(uuid())
+  restaurantId String
+  /// MANHA ou TARDE_NOITE (códigos estáveis usados em relatórios)
+  code         String
+  name         String
+  startTime    String  @default("00:00")
+  endTime      String  @default("23:59")
+  sortOrder    Int     @default(0)
+  active       Boolean @default(true)
+
+  restaurant Restaurant    @relation(fields: [restaurantId], references: [id])
+  sessions   CashSession[]
+
+  @@unique([restaurantId, code])
+  @@map("shifts")
+}
+
+model SalesChannel {
+  id           String  @id @default(uuid())
+  restaurantId String
+  name         String
+  /// plataformas de delivery/online, conferidas individualmente na linha "Pagamento online"
+  isPlatform   Boolean @default(false)
+  active       Boolean @default(true)
+  sortOrder    Int     @default(0)
+
+  restaurant    Restaurant     @relation(fields: [restaurantId], references: [id])
+  movements     CashMovement[]
+  cancellations Cancellation[]
+
+  // Canais são independentes: não existe pai/filho (99Food NÃO está dentro da Eclética).
+  @@unique([restaurantId, name])
+  @@map("sales_channels")
+}
+
+model PaymentMethod {
+  id           String      @id @default(uuid())
+  restaurantId String
+  name         String
+  kind         PaymentKind
+  active       Boolean     @default(true)
+  sortOrder    Int         @default(0)
+
+  restaurant    Restaurant     @relation(fields: [restaurantId], references: [id])
+  movements     CashMovement[]
+  cancellations Cancellation[]
+  conferences   ClosingConference[]
+  details       ClosingDetail[]
+
+  @@unique([restaurantId, name])
+  @@map("payment_methods")
+}
+
+model TicketBrand {
+  id           String  @id @default(uuid())
+  restaurantId String
+  name         String
+  active       Boolean @default(true)
+  sortOrder    Int     @default(0)
+
+  restaurant    Restaurant          @relation(fields: [restaurantId], references: [id])
+  movements     CashMovement[]
+  cancellations Cancellation[]
+  conferences   ClosingConference[]
+  details       ClosingDetail[]
+
+  @@unique([restaurantId, name])
+  @@map("ticket_brands")
+}
+
+model CashSession {
+  id                String        @id @default(uuid())
+  restaurantId      String
+  registerId        String
+  shiftId           String
+  /// data do negócio (não do relógio): um turno da noite que passa da meia-noite continua no mesmo dia
+  businessDate      DateTime      @db.Date
+  responsibleId     String
+  openedAt          DateTime      @default(now())
+  /// FUNDO DE ABERTURA. Não é faturamento.
+  openingFloatCents Int
+  floatMode         FloatMode     @default(NEW_OPENING)
+  transferredFromId String?
+  openingNote       String?
+  status            SessionStatus @default(OPEN)
+  closedAt          DateTime?
+  closedById        String?
+  reopenCount       Int           @default(0)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  restaurant      Restaurant          @relation(fields: [restaurantId], references: [id])
+  register        CashRegister        @relation(fields: [registerId], references: [id])
+  shift           Shift               @relation(fields: [shiftId], references: [id])
+  responsible     User                @relation("SessionResponsible", fields: [responsibleId], references: [id])
+  closedBy        User?               @relation("SessionClosedBy", fields: [closedById], references: [id])
+  transferredFrom CashSession?        @relation("FloatTransfer", fields: [transferredFromId], references: [id])
+  transfers       CashSession[]       @relation("FloatTransfer")
+  movements       CashMovement[]
+  cancellations   Cancellation[]
+  conferences     ClosingConference[]
+  closing         CashClosing?
+  adjustments     Adjustment[]
+  emailLogs       EmailLog[]
+
+  @@unique([registerId, shiftId, businessDate])
+  @@index([restaurantId, businessDate])
+  @@index([status])
+  @@map("cash_sessions")
+}
+
+/// Livro-razão do caixa. Cada linha carrega os dois efeitos: faturamento e saldo físico.
+model CashMovement {
+  id              String         @id @default(uuid())
+  restaurantId    String
+  sessionId       String
+  type            MovementType
+  status          MovementStatus @default(ACTIVE)
+  /// sempre positivo; o sinal vem de revenueEffect/cashEffect
+  amountCents     Int
+  /// -1, 0 ou +1: afeta o FATURAMENTO?
+  revenueEffect   Int
+  /// -1, 0 ou +1: afeta o SALDO FÍSICO DO CAIXA?
+  cashEffect      Int
+  channelId       String?
+  paymentMethodId String?
+  ticketBrandId   String?
+  orderNumber     String?
+  description     String?
+  employeeName    String?
+  occurredAt      DateTime       @default(now())
+  createdById     String
+  /// impede lançamento duplicado por clique duplo ou reenvio do formulário
+  idempotencyKey  String?
+  voidedAt        DateTime?
+  voidedById      String?
+  voidReason      String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  restaurant    Restaurant     @relation(fields: [restaurantId], references: [id])
+  session       CashSession    @relation(fields: [sessionId], references: [id])
+  channel       SalesChannel?  @relation(fields: [channelId], references: [id])
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+  ticketBrand   TicketBrand?   @relation(fields: [ticketBrandId], references: [id])
+  createdBy     User           @relation("MovementCreatedBy", fields: [createdById], references: [id])
+  voidedBy      User?          @relation("MovementVoidedBy", fields: [voidedById], references: [id])
+  cancellation  Cancellation?
+
+  @@unique([sessionId, idempotencyKey])
+  @@index([sessionId, status])
+  @@index([restaurantId, occurredAt])
+  @@map("cash_movements")
+}
+
+/// Pedidos cancelados. Nunca apagados. Ligados à venda quando ela tinha sido lançada.
+model Cancellation {
+  id              String   @id @default(uuid())
+  restaurantId    String
+  sessionId       String
+  /// venda lançada que foi cancelada. Null = pedido que nunca entrou como venda (só informativo)
+  movementId      String?  @unique
+  orderNumber     String
+  channelId       String
+  paymentMethodId String?
+  ticketBrandId   String?
+  amountCents     Int
+  reason          String
+  employeeName    String
+  occurredAt      DateTime @default(now())
+  createdById     String
+  createdAt       DateTime @default(now())
+
+  restaurant    Restaurant     @relation(fields: [restaurantId], references: [id])
+  session       CashSession    @relation(fields: [sessionId], references: [id])
+  movement      CashMovement?  @relation(fields: [movementId], references: [id])
+  channel       SalesChannel   @relation(fields: [channelId], references: [id])
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+  ticketBrand   TicketBrand?   @relation(fields: [ticketBrandId], references: [id])
+  createdBy     User           @relation(fields: [createdById], references: [id])
+
+  @@index([sessionId])
+  @@index([restaurantId, occurredAt])
+  @@map("cancellations")
+}
+
+/// Uma linha por item conferido. Enquanto a sessão está aberta guarda só o valor digitado;
+/// no fechamento congela sistema, esperado e diferença.
+model ClosingConference {
+  id              String       @id @default(uuid())
+  sessionId       String
+  closingId       String?
+  /// cash | pm:<método> | pm:<método>:tb:<bandeira> | pm:<método>:ch:<canal>
+  lineKey         String
+  groupKind       PaymentKind
+  paymentMethodId String?
+  ticketBrandId   String?
+  channelId       String?
+  label           String
+  systemCents     Int?
+  expectedCents   Int?
+  checkedCents    Int?
+  differenceCents Int?
+  note            String?
+  updatedById     String?
+  updatedAt       DateTime     @updatedAt
+  createdAt       DateTime     @default(now())
+
+  session       CashSession    @relation(fields: [sessionId], references: [id])
+  closing       CashClosing?   @relation(fields: [closingId], references: [id])
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+  ticketBrand   TicketBrand?   @relation(fields: [ticketBrandId], references: [id])
+
+  @@unique([sessionId, lineKey])
+  @@index([closingId])
+  @@map("closing_conferences")
+}
+
+model CashClosing {
+  id           String        @id @default(uuid())
+  restaurantId String
+  sessionId    String        @unique
+  /// 1 no primeiro fechamento; sobe a cada fechamento após reabertura
+  revision     Int           @default(1)
+  status       ClosingStatus
+
+  floatCents        Int
+  revenueCents      Int
+  grossSalesCents   Int
+  refundsCents      Int
+  controlledCents   Int
+  cashSalesCents    Int
+  creditCents       Int
+  debitCents        Int
+  cardsCents        Int
+  pixCents          Int
+  ticketsCents      Int
+  onlineCents       Int
+  otherCents        Int
+  suppliesCents     Int
+  withdrawalsCents  Int
+  expensesCents     Int
+  cancellationsCents Int
+  cashExpectedCents Int
+  cashCountedCents  Int
+  cashDiffCents     Int
+  cardsDiffCents    Int
+  pixDiffCents      Int
+  ticketsDiffCents  Int
+  onlineDiffCents   Int
+  otherDiffCents    Int
+  /// divergência líquida (com sinal)
+  totalDiffCents    Int
+  /// soma dos módulos das diferenças
+  absDiffCents      Int
+  toleranceCents    Int
+
+  justification String?
+  notes         String?
+  /// foto completa dos números usados no fechamento (relatório do histórico lê daqui)
+  snapshot      Json
+  closedAt      DateTime
+  closedById    String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  restaurant  Restaurant          @relation(fields: [restaurantId], references: [id])
+  session     CashSession         @relation(fields: [sessionId], references: [id])
+  closedBy    User                @relation(fields: [closedById], references: [id])
+  conferences ClosingConference[]
+  details     ClosingDetail[]
+  emailLogs   EmailLog[]
+  adjustments Adjustment[]
+
+  @@index([restaurantId, closedAt])
+  @@map("cash_closings")
+}
+
+/// Matriz canal x forma de pagamento (x bandeira) e totais por tipo, congelados no fechamento.
+model ClosingDetail {
+  id              String  @id @default(uuid())
+  closingId       String
+  /// MATRIX | MOVEMENT_TOTAL
+  section         String
+  channelId       String?
+  paymentMethodId String?
+  ticketBrandId   String?
+  label           String
+  amountCents     Int
+
+  closing       CashClosing    @relation(fields: [closingId], references: [id], onDelete: Cascade)
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+  ticketBrand   TicketBrand?   @relation(fields: [ticketBrandId], references: [id])
+
+  @@index([closingId])
+  @@map("closing_details")
+}
+
+/// Toda alteração de campo financeiro: valor anterior, novo, campo, usuário, data e motivo.
+/// Só aceita INSERT (gatilho no banco bloqueia UPDATE e DELETE).
+model Adjustment {
+  id           String   @id @default(uuid())
+  restaurantId String
+  sessionId    String
+  closingId    String?
+  entity       String
+  entityId     String
+  field        String
+  oldValue     String?
+  newValue     String?
+  reason       String
+  userId       String
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant   @relation(fields: [restaurantId], references: [id])
+  session    CashSession  @relation(fields: [sessionId], references: [id])
+  closing    CashClosing? @relation(fields: [closingId], references: [id])
+  user       User         @relation(fields: [userId], references: [id])
+
+  @@index([sessionId])
+  @@index([entity, entityId])
+  @@map("adjustments")
+}
+
+/// Trilha de auditoria. Só aceita INSERT (gatilho no banco bloqueia UPDATE e DELETE).
+model AuditLog {
+  id           String   @id @default(uuid())
+  restaurantId String?
+  userId       String?
+  /// nome no momento da ação (continua legível mesmo que o usuário seja renomeado)
+  userName     String?
+  action       String
+  entity       String?
+  entityId     String?
+  sessionId    String?
+  oldValue     Json?
+  newValue     Json?
+  reason       String?
+  ip           String?
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant? @relation(fields: [restaurantId], references: [id])
+  user       User?       @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([sessionId])
+  @@index([action])
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+model EmailLog {
+  id                String      @id @default(uuid())
+  restaurantId      String
+  closingId         String
+  sessionId         String
+  toEmails          String[]
+  subject           String
+  status            EmailStatus @default(PENDING)
+  error             String?
+  attempt           Int         @default(1)
+  providerMessageId String?
+  createdById       String?
+  createdAt         DateTime    @default(now())
+  sentAt            DateTime?
+
+  restaurant Restaurant  @relation(fields: [restaurantId], references: [id])
+  closing    CashClosing @relation(fields: [closingId], references: [id])
+  session    CashSession @relation(fields: [sessionId], references: [id])
+  createdBy  User?       @relation(fields: [createdById], references: [id])
+
+  @@index([closingId])
+  @@map("email_logs")
+}
+
+model Setting {
+  id                      String    @id @default(uuid())
+  restaurantId            String    @unique
+  /// fundo padrão na abertura (R$ 100,00)
+  defaultOpeningFloatCents Int      @default(10000)
+  /// diferença aceita sem justificativa
+  toleranceCents          Int       @default(0)
+  defaultFloatMode        FloatMode @default(NEW_OPENING)
+  closingRecipients       String[]
+  emailFrom               String?
+  updatedAt               DateTime  @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@map("settings")
+}
