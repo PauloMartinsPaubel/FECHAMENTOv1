@@ -76,6 +76,31 @@ describe("leitura do pedido do iFood", () => {
   });
 });
 
+describe("pedido no formato da página Estrutura do pedido (Logistics)", () => {
+  const base = { id: "4934a1e8-2071-4ac7-9ff6-6e634bb6008d", orderType: "DELIVERY", orderTiming: "IMMEDIATE", displayId: "9843", createdAt: "2024-03-20T14:33:08.052Z", isTest: true, merchant: { id: "b0954b6b", name: "Teste" } };
+  it("cartão de crédito na entrega, sem bloco total: valor vem dos pagamentos", () => {
+    const o = mapIfoodOrder({ ...base, payments: { prepaid: 0, pending: 323.99, methods: [{ value: 323.99, currency: "BRL", method: "CREDIT", prepaid: false, type: "OFFLINE" }] } });
+    expect(o).toMatchObject({ totalCents: 32399, onlineCents: 0, offlineCents: 32399, displayId: "9843", merchantId: "b0954b6b" });
+    expect(o.payments[0]).toMatchObject({ cashKind: "CREDIT", brand: null });
+    expect(o.warnings).toEqual(expect.arrayContaining([expect.stringContaining("sem bloco total"), expect.stringContaining("teste")]));
+  });
+  it("dinheiro com troco: o troco não é valor do pedido", () => {
+    const o = mapIfoodOrder({ ...base, isTest: false, payments: { prepaid: 0, pending: 103.99, methods: [{ value: 103.99, currency: "BRL", method: "CASH", prepaid: false, type: "OFFLINE", cash: { changeFor: 150 } }] } });
+    expect(o).toMatchObject({ totalCents: 10399, offlineCents: 10399 });
+    expect(o.payments[0].cashKind).toBe("CASH");
+    expect(o.warnings.some((w) => w.includes("teste"))).toBe(false);
+  });
+  it("sem payments: zerado e avisado, nunca inventa valor", () => {
+    const o = mapIfoodOrder(base);
+    expect([o.totalCents, o.onlineCents, o.offlineCents]).toEqual([0, 0, 0]);
+    expect(o.warnings.some((w) => w.includes("sem lista de pagamentos"))).toBe(true);
+  });
+  it("carteira digital e vale-presente na entrega caem em Outros", () => {
+    expect(cashKindFor("DIGITAL_WALLET", "OFFLINE")).toBe("OTHER");
+    expect(cashKindFor("GIFT_CARD", "OFFLINE")).toBe("OTHER");
+  });
+});
+
 describe("eventos e status", () => {
   it("códigos curtos e longos", () => {
     expect(statusFromEventCode("PLC")).toBe("PLACED");

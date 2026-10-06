@@ -4,9 +4,11 @@
  * Eventos: conferidos com a página Endpoints do módulo Order (id, code, fullCode, orderId, createdAt).
  * O código pode vir curto ("CFM"), por extenso ("CONFIRMED") ou completo ("ORDER_CONFIRMED").
  *
- * Pedido: a página de endpoints mostra só id, status, orderType, category e total. Os campos de valores
- * abaixo ainda precisam ser conferidos com a página "Estrutura completa do pedido". Tudo o que depende
- * do formato do pedido está NESTE arquivo e nos testes dele.
+ * Pedido: payments (prepaid, pending, methods[].{value, method, type}), id, displayId, createdAt, isTest e
+ * merchant.id conferidos com a página "Estrutura do pedido", que é do módulo Logistics e NÃO traz o bloco total
+ * nem a bandeira do cartão. Sem total, o valor sai da soma dos pagamentos. Os campos total.* abaixo ainda
+ * precisam ser conferidos com a página do módulo Order. Tudo o que depende do formato do pedido está
+ * NESTE arquivo e nos testes dele.
  *
  * Campos usados:
  *   id, displayId, createdAt, orderType, status, merchant.id
@@ -124,13 +126,16 @@ export function mapIfoodOrder(input: unknown): NormalizedOrder {
     }
     return c;
   };
-  const subtotalCents = cents(total.subTotal, "total.subTotal");
-  const deliveryFeeCents = cents(total.deliveryFee ?? 0, "total.deliveryFee");
-  const benefitsCents = cents(total.benefits ?? 0, "total.benefits");
-  const additionalCents = cents(total.additionalFees ?? 0, "total.additionalFees");
-  const orderAmount = decimalToCents(total.orderAmount);
-  const totalCents = orderAmount ?? subtotalCents + deliveryFeeCents + additionalCents - benefitsCents;
-  if (orderAmount === null) warnings.push("total.orderAmount ausente; total calculado pelas parcelas.");
+  // pedido no formato do módulo Logistics não traz o bloco total: o valor sai dos pagamentos, mais abaixo
+  const hasTotal = Object.keys(total).length > 0;
+  const quiet = (v: unknown, label: string) => (hasTotal ? cents(v, label) : 0);
+  const subtotalCents = quiet(total.subTotal, "total.subTotal");
+  const deliveryFeeCents = quiet(total.deliveryFee ?? 0, "total.deliveryFee");
+  const benefitsCents = quiet(total.benefits ?? 0, "total.benefits");
+  const additionalCents = quiet(total.additionalFees ?? 0, "total.additionalFees");
+  const orderAmount = hasTotal ? decimalToCents(total.orderAmount) : null;
+  let totalCents = orderAmount ?? subtotalCents + deliveryFeeCents + additionalCents - benefitsCents;
+  if (hasTotal && orderAmount === null) warnings.push("total.orderAmount ausente; total calculado pelas parcelas.");
 
   const pay = obj(o.payments);
   const methods = Array.isArray(pay.methods) ? pay.methods : [];
@@ -164,6 +169,12 @@ export function mapIfoodOrder(input: unknown): NormalizedOrder {
       `Soma dos pagamentos (${onlineCents + offlineCents}) difere de pré-pago + a receber (${prepaid + pending}).`,
     );
   }
+
+  if (!hasTotal) {
+    totalCents = onlineCents + offlineCents;
+    warnings.push("Pedido sem bloco total; valor calculado pela soma dos pagamentos.");
+  }
+  if (o.isTest === true) warnings.push("Pedido de teste do iFood.");
 
   return {
     externalId,
