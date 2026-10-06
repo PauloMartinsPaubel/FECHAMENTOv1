@@ -4,18 +4,24 @@ import { Alert } from "@/components/ui";
 import { getSessionPage } from "@/server/session-page";
 import { ConferenceForm } from "../conference-form";
 import { ConferenceTable } from "../conference-table";
+import { IfoodPanel } from "../ifood-panel";
+import { ifoodShiftComparison } from "@/server/services/integrations";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Conferência de valores" };
 
 export default async function ConferencePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { bundle, editMode } = await getSessionPage(id);
+  const { bundle, editMode, actor } = await getSessionPage(id);
   const { evaluation: ev, session, settings } = bundle;
+  const ifood = await ifoodShiftComparison(actor, id).catch(() => null);
+  const ifoodPanel = ifood ? <IfoodPanel c={ifood} sessionId={id} canSync={Boolean(editMode) && can(actor.role, "conference.write")} /> : null;
 
   if (!editMode) {
     return (
       <div className="space-y-4">
         <Alert tone="info">Conferência concluída. Veja o fechamento na aba <Link className="link" href={`/caixa/${id}/fechamento`}>Fechamento</Link>.</Alert>
+        {ifoodPanel}
         <ConferenceTable lines={ev.lines} cash={ev.summary.cash} divergence={ev.divergence} />
       </div>
     );
@@ -28,6 +34,7 @@ export default async function ConferencePage({ params }: { params: Promise<{ id:
         Conferência de valores: compare o que o sistema registrou com o que a gaveta, as máquinas, o extrato de PIX e as plataformas mostram.
         Para fechar o caixa, vá para a aba <Link className="link" href={`/caixa/${id}/fechamento`}>Fechamento</Link>.
       </p>
+      {ifoodPanel}
       <ConferenceForm
         sessionId={session.id}
         lines={ev.lines.map((l) => ({ key: l.key, group: l.group, label: l.label, fullLabel: l.fullLabel, systemCents: l.systemCents, expectedCents: l.expectedCents, checkedCents: l.checkedCents, required: l.required }))}

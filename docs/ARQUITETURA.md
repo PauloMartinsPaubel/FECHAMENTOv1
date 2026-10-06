@@ -194,3 +194,11 @@ Registrados: login (sucesso e falha), logout, abertura, cada venda e movimentaç
 ## 10. Segurança
 
 Senha com bcrypt; token de sessão aleatório de 256 bits, guardado só como hash no banco, em cookie `HttpOnly`, `SameSite=Lax` e `Secure` em produção; bloqueio temporário após tentativas falhas; Server Actions com verificação de origem do Next; cabeçalhos de segurança; todo SQL via Prisma (parametrizado); CSV protegido contra injeção de fórmula; todo HTML de relatório escapa o texto digitado.
+
+## 11. Integrações com plataformas (iFood, fase 1)
+
+Só leitura, para conferência. Tabelas `platform_integrations` (configuração por restaurante, sem credenciais), `platform_orders` (pedido como a plataforma informou, em centavos, com o JSON original) e `platform_events` (cada evento uma vez só). As credenciais ficam em variáveis de ambiente.
+
+Sincronização idempotente: busca os eventos, grava cada um uma vez, busca o detalhe dos pedidos novos, grava, e só então confirma os eventos ao iFood. Pedido cuja leitura falhou não tem o evento confirmado e volta na rodada seguinte. Status só avança; cancelado vence tudo e não é apagado.
+
+O pedido entra no dia de negócio e no turno pela hora local; pedido de madrugada, antes do primeiro turno, fica no último turno do dia anterior. Na conferência, "pago no app" é comparado com as vendas online do canal iFood; pagamento na entrega aparece à parte, porque já entra na conferência de dinheiro, cartão ou ticket. A fase 2 (lançar os pedidos no caixa automaticamente) só depois de a fase 1 bater com o painel do iFood por alguns dias.

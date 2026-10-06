@@ -35,3 +35,14 @@ Os testes de integração só rodam em banco cujo nome termina em `_test`.
 - PDF sai pela impressão do navegador; o anexo do e-mail é HTML.
 - O bloqueio de tentativas de login é por usuário, não por IP. Em produção, ponha um limitador de taxa na frente.
 - Sessão fora do HTTPS: defina `COOKIE_SECURE=false` só em rede interna.
+
+## Integração com o iFood (fase 1: só leitura)
+
+O sistema busca os pedidos do iFood e mostra, na aba Conferência de cada caixa, quanto o iFood registrou no turno contra o que foi lançado no canal iFood. Nada é lançado sozinho no caixa.
+
+1. Peça ao iFood a conta de desenvolvedor e as credenciais (client id e client secret).
+2. Na Vercel, cadastre `IFOOD_CLIENT_ID` e `IFOOD_CLIENT_SECRET` (e, se o iFood indicar outro endereço, `IFOOD_BASE_URL`). Faça um novo deploy.
+3. No banco de produção, rode a migração `prisma/migrations/20261006144046_integracoes_plataformas/migration.sql` (no Supabase: SQL Editor, colar e Run).
+4. No sistema, em Integrações, informe o código da loja (merchantId), escolha o canal iFood e ligue.
+
+O formato do pedido do iFood está isolado em `src/server/integrations/ifood/mapper.ts`, com testes em `tests/unit/ifood.test.ts`. Ao ter acesso à documentação oficial, confira os nomes dos campos ali.

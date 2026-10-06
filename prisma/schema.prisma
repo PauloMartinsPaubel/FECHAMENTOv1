@@ -558,3 +558,92 @@ model Setting {
 
   @@map("settings")
 }
+
+// ============================================================================
+// Integrações com plataformas de venda (fase 1: só leitura, para conferência)
+// ============================================================================
+
+enum PlatformProvider {
+  IFOOD
+}
+
+enum PlatformOrderStatus {
+  PLACED
+  CONFIRMED
+  DISPATCHED
+  READY
+  CONCLUDED
+  CANCELLED
+}
+
+/// Configuração da integração por restaurante. Credenciais NÃO ficam aqui: vêm de variáveis de ambiente.
+model PlatformIntegration {
+  id           String           @id @default(uuid())
+  restaurantId String
+  provider     PlatformProvider
+  /// id da loja na plataforma (merchantId do iFood)
+  merchantId   String?
+  /// canal do caixa que recebe os pedidos desta plataforma (ex.: iFood)
+  channelId    String?
+  enabled      Boolean          @default(false)
+  lastSyncAt   DateTime?
+  lastSyncOk   Boolean?
+  lastSyncInfo String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([restaurantId, provider])
+  @@map("platform_integrations")
+}
+
+/// Pedido como a plataforma informou. Valores em centavos; o JSON original fica guardado para auditoria.
+model PlatformOrder {
+  id               String              @id @default(uuid())
+  restaurantId     String
+  provider         PlatformProvider
+  externalId       String
+  displayId        String?
+  merchantId       String?
+  status           PlatformOrderStatus
+  placedAt         DateTime
+  /// data do negócio no fuso do restaurante (YYYY-MM-DD do placedAt)
+  businessDate     DateTime            @db.Date
+  orderType        String?
+  subtotalCents    Int
+  deliveryFeeCents Int
+  benefitsCents    Int
+  /// total do pedido segundo a plataforma
+  totalCents       Int
+  /// pago pelo app (não passa pelo caixa físico)
+  onlineCents      Int
+  /// a receber na entrega: dinheiro, maquininha, ticket na entrega
+  offlineCents     Int
+  /// [{ method, type, valueCents, brand }]
+  payments         Json
+  raw              Json
+  cancelledAt      DateTime?
+  cancelReason     String?
+  lastEventAt      DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@unique([provider, externalId])
+  @@index([restaurantId, businessDate])
+  @@map("platform_orders")
+}
+
+/// Cada evento recebido, uma vez só (o id do evento é único). Garante que reprocessar não duplica nada.
+model PlatformEvent {
+  id              String           @id @default(uuid())
+  provider        PlatformProvider
+  externalId      String
+  orderExternalId String?
+  code            String
+  occurredAt      DateTime?
+  raw             Json
+  receivedAt      DateTime         @default(now())
+
+  @@unique([provider, externalId])
+  @@index([orderExternalId])
+  @@map("platform_events")
+}
