@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { saveIfoodSettings, syncIfoodNow } from "@/server/services/integrations";
+import { errorMessage } from "@/server/errors";
+import type { IfoodMerchant } from "@/server/integrations/ifood/client";
+import { listIfoodMerchants, saveIfoodSettings, syncIfoodNow } from "@/server/services/integrations";
 import type { ActionState } from "./types";
 import { actorFromSession, bool, optStr, run, str } from "./util";
 
@@ -26,4 +28,14 @@ export async function syncIfoodAction(_p: ActionState, fd: FormData): Promise<Ac
     }
     return r.events === 0 ? "Nenhum pedido novo no iFood." : `${r.ordersSaved} pedido(s) do iFood atualizado(s).`;
   });
+}
+
+export async function listIfoodMerchantsAction(): Promise<{ ok: true; merchants: IfoodMerchant[] } | { ok: false; error: string }> {
+  try {
+    const actor = await actorFromSession();
+    return { ok: true, merchants: await listIfoodMerchants(actor) };
+  } catch (err) {
+    if (err && typeof err === "object" && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
+    return { ok: false, error: errorMessage(err) };
+  }
 }

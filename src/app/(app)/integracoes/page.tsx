@@ -46,7 +46,7 @@ export default async function IntegrationsPage() {
         ) : null}
 
         {can(user.role, "settings.manage") ? (
-          <IfoodSettingsForm merchantId={row?.merchantId ?? ""} channelId={row?.channelId ?? ifoodChannel?.id ?? channels[0]?.id ?? ""} enabled={row?.enabled ?? false} channels={channels.map((c) => ({ id: c.id, name: c.name }))} />
+          <IfoodSettingsForm merchantId={row?.merchantId ?? ""} channelId={row?.channelId ?? ifoodChannel?.id ?? channels[0]?.id ?? ""} enabled={row?.enabled ?? false} channels={channels.map((c) => ({ id: c.id, name: c.name }))} credentialsConfigured={credentialsConfigured} />
         ) : (
           <p className="text-sm text-stone-600">Somente o administrador altera esta configuração.</p>
         )}

@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { prisma } from "@/server/db";
 import { bootstrap, Env } from "./setup";
 import { IfoodClient } from "@/server/integrations/ifood/client";
-import { ifoodShiftComparison, saveIfoodSettings, syncIfoodNow } from "@/server/services/integrations";
+import { ifoodShiftComparison, listIfoodMerchants, saveIfoodSettings, syncIfoodNow } from "@/server/services/integrations";
 import { openSession } from "@/server/services/sessions";
 import { createMovement } from "@/server/services/movements";
 import { ifoodEvent, ifoodOrder } from "../fixtures/ifood";
@@ -77,6 +77,9 @@ class FakeIfood {
       }
       return send(202, { status: "ACCEPTED" });
     }
+    if (url === "/merchant/v1.0/merchants") {
+      return send(200, [{ id: "loja-123", name: "Restaurante Teste", corporateName: "Restaurante Ltda" }, { name: "sem id" }]);
+    }
     const m = url.match(/^\/order\/v1\.0\/orders\/(.+)$/);
     if (m) {
       const id = decodeURIComponent(m[1]);
@@ -107,6 +110,15 @@ describe("configuração", () => {
     await expect(saveIfoodSettings(env.admin, { merchantId: "", channelId: env.ch("iFood"), enabled: true })).rejects.toThrow(/merchantId/);
     const s = await saveIfoodSettings(env.admin, { merchantId: "loja-123", channelId: env.ch("iFood"), enabled: true });
     expect(s).toMatchObject({ merchantId: "loja-123", enabled: true });
+  });
+
+  it("lista as lojas liberadas para achar o merchantId; só o administrador", async () => {
+    await expect(listIfoodMerchants(env.admin, { client: client() })).resolves.toEqual([
+      { id: "loja-123", name: "Restaurante Teste", corporateName: "Restaurante Ltda" },
+    ]);
+    await expect(listIfoodMerchants(env.manager, { client: client() })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    const bad = new IfoodClient({ baseUrl: fake.url, clientId: "cliente", clientSecret: "errado" });
+    await expect(listIfoodMerchants(env.admin, { client: bad })).rejects.toThrow(/recusou as credenciais/);
   });
 
   it("sem credenciais no servidor, avisa com clareza", async () => {

@@ -3,6 +3,7 @@
  *
  *   POST {base}/authentication/v1.0/oauth/token   (form: grantType=client_credentials, clientId, clientSecret)
  *   GET  {base}/order/v1.0/orders/{id}
+ *   GET  {base}/merchant/v1.0/merchants          lojas que autorizaram o aplicativo (para achar o merchantId)
  *
  * Eventos: a documentação oficial traz duas rotas, e as duas páginas não batem entre si.
  *   "events" (introdução do módulo Events, base /events/v1.0):
@@ -24,6 +25,12 @@ export class IfoodError extends Error {
     super(message);
     this.name = "IfoodError";
   }
+}
+
+export interface IfoodMerchant {
+  id: string;
+  name: string | null;
+  corporateName: string | null;
 }
 
 export type IfoodEventsRoute = "events" | "orders";
@@ -168,6 +175,25 @@ export class IfoodClient {
     let res = await post(bodies[0]);
     if (BODY_REJECTED.has(res.status)) res = await post(bodies[1]);
     if (!res.ok) await this.fail(res, "Falha ao confirmar eventos no iFood");
+  }
+
+  /**
+   * Lojas que este aplicativo pode ler (módulo Merchant). Serve para achar o merchantId sem procurar no portal.
+   * Só lê a primeira página: um restaurante tem poucas lojas.
+   */
+  async listMerchants(): Promise<IfoodMerchant[]> {
+    const res = await this.request("/merchant/v1.0/merchants", { method: "GET" });
+    if (res.status === 204) return [];
+    if (!res.ok) await this.fail(res, "Falha ao listar as lojas no iFood");
+    const json = (await res.json().catch(() => null)) as unknown;
+    const list = Array.isArray(json) ? json : Array.isArray((json as { merchants?: unknown })?.merchants) ? (json as { merchants: unknown[] }).merchants : null;
+    if (!list) throw new IfoodError("Resposta de lojas do iFood em formato desconhecido.");
+    const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+    return list.flatMap((m) => {
+      const o = (m ?? {}) as Record<string, unknown>;
+      const id = text(o.id);
+      return id ? [{ id, name: text(o.name), corporateName: text(o.corporateName) }] : [];
+    });
   }
 
   async getOrder(orderId: string): Promise<unknown> {

@@ -4,7 +4,7 @@ import { Actor, assertCan } from "../actor";
 import { audit } from "../audit";
 import { prisma } from "../db";
 import { ServiceError } from "../errors";
-import { IfoodClient, ifoodConfigFromEnv } from "../integrations/ifood/client";
+import { IfoodClient, ifoodConfigFromEnv, IfoodMerchant } from "../integrations/ifood/client";
 import { SyncResult, syncIfoodOnce } from "../integrations/ifood/sync";
 import { assignShift, NormalizedPayment } from "../integrations/shared";
 import { loadSessionBundle } from "../loaders";
@@ -15,6 +15,20 @@ export async function getIfoodIntegration(actor: Actor) {
     where: { restaurantId_provider: { restaurantId: actor.restaurantId, provider: "IFOOD" } },
   });
   return { row, credentialsConfigured: ifoodConfigFromEnv() !== null };
+}
+
+/** Lojas que as credenciais do servidor enxergam no iFood. Só o administrador, que é quem configura. */
+export async function listIfoodMerchants(actor: Actor, options: { client?: IfoodClient } = {}): Promise<IfoodMerchant[]> {
+  assertCan(actor, "settings.manage");
+  const config = ifoodConfigFromEnv();
+  if (!options.client && !config) {
+    throw new ServiceError("As credenciais do iFood ainda não foram configuradas no servidor (IFOOD_CLIENT_ID e IFOOD_CLIENT_SECRET).", "STATE");
+  }
+  try {
+    return await (options.client ?? new IfoodClient(config!)).listMerchants();
+  } catch (err) {
+    throw new ServiceError(`Não foi possível listar as lojas no iFood: ${(err as Error).message.slice(0, 300)}`, "STATE");
+  }
 }
 
 export async function saveIfoodSettings(actor: Actor, input: { merchantId: string; channelId: string; enabled: boolean }) {
