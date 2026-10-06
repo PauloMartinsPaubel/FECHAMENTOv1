@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { errorMessage } from "@/server/errors";
 import type { IfoodMerchant } from "@/server/integrations/ifood/client";
-import { listIfoodMerchants, saveIfoodSettings, syncIfoodNow } from "@/server/services/integrations";
+import { autoSyncIfood, listIfoodMerchants, saveIfoodSettings, syncIfoodNow } from "@/server/services/integrations";
 import type { ActionState } from "./types";
 import { actorFromSession, bool, optStr, run, str } from "./util";
 
@@ -37,5 +37,17 @@ export async function listIfoodMerchantsAction(): Promise<{ ok: true; merchants:
   } catch (err) {
     if (err && typeof err === "object" && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
     return { ok: false, error: errorMessage(err) };
+  }
+}
+
+/** Chamada pela tela ao abrir. Não mostra erro: a última busca e o motivo aparecem na própria tela. */
+export async function autoSyncIfoodAction(): Promise<{ changed: boolean }> {
+  try {
+    const actor = await actorFromSession();
+    const r = await autoSyncIfood(actor);
+    return { changed: r.changed };
+  } catch (err) {
+    if (err && typeof err === "object" && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
+    return { changed: false };
   }
 }

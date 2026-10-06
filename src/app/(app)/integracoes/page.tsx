@@ -4,6 +4,7 @@ import { formatBRL } from "@/lib/finance";
 import { can } from "@/lib/permissions";
 import { Alert, Badge, Empty, PageHeader } from "@/components/ui";
 import { IfoodSyncButton } from "@/components/ifood-sync-button";
+import { IfoodAutoSync } from "@/components/ifood-auto-sync";
 import { clientIp, requirePermission } from "@/server/auth/current";
 import { prisma } from "@/server/db";
 import { getIfoodIntegration, listRecentPlatformOrders } from "@/server/services/integrations";
@@ -52,7 +53,7 @@ export default async function IntegrationsPage() {
         )}
 
         <div className="flex flex-wrap items-center gap-3 border-t border-stone-200 pt-4">
-          {row?.enabled && credentialsConfigured ? <IfoodSyncButton /> : null}
+          {row?.enabled && credentialsConfigured && can(user.role, "conference.write") ? <><IfoodAutoSync /><IfoodSyncButton /></> : null}
           <p className="text-sm text-stone-600">
             Última busca: {row?.lastSyncAt ? formatDateTimeBR(row.lastSyncAt) : "nunca"}
             {row?.lastSyncInfo ? <span className={row.lastSyncOk === false ? "text-red-700" : ""}> · {row.lastSyncInfo}</span> : null}

@@ -2,6 +2,7 @@ import { formatDateTimeBR, formatTimeBR } from "@/lib/dates";
 import { formatBRL, KIND_LABEL, type PaymentKind } from "@/lib/finance";
 import { Diff } from "@/components/ui";
 import { IfoodSyncButton } from "@/components/ifood-sync-button";
+import { IfoodAutoSync } from "@/components/ifood-auto-sync";
 import type { IfoodShiftComparison } from "@/server/services/integrations";
 
 /** Painel na Conferência: o que o iFood registrou neste turno x o que foi lançado no caixa. */
@@ -12,7 +13,7 @@ export function IfoodPanel({ c, sessionId, canSync }: { c: IfoodShiftComparison;
     <section className="card space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-bold">Pedidos do iFood neste turno</h2>
-        {canSync ? <IfoodSyncButton sessionId={sessionId} /> : null}
+        {canSync ? <><IfoodAutoSync /><IfoodSyncButton sessionId={sessionId} /></> : null}
       </div>
       <p className="text-xs text-stone-500">
         {c.activeCount} pedido(s) válido(s){c.cancelledCount ? `, ${c.cancelledCount} cancelado(s) (${formatBRL(c.cancelledCents)}, fora da conta)` : ""}.

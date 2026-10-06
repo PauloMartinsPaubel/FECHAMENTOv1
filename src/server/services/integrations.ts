@@ -1,5 +1,6 @@
 import { fromDbDate, toDbDate } from "@/lib/dates";
 import type { PaymentKind } from "@/lib/finance";
+import { can } from "@/lib/permissions";
 import { Actor, assertCan } from "../actor";
 import { audit } from "../audit";
 import { prisma } from "../db";
@@ -68,8 +69,41 @@ function summarize(r: SyncResult): string {
   return parts.join(", ") + ".";
 }
 
+/** Intervalo mínimo entre duas buscas automáticas (abrir a Conferência ou Integrações). */
+export const IFOOD_AUTO_SYNC_MS = 60_000;
+
+/**
+ * Busca automática, disparada quando alguém abre a Conferência ou Integrações. Nunca lança erro:
+ * se não puder (sem credencial, desligada, sem permissão, buscou há menos de 1 minuto), não faz nada.
+ * Reserva a vez gravando lastSyncAt antes de buscar, para duas telas abertas juntas não buscarem em dobro.
+ */
+export async function autoSyncIfood(actor: Actor, options: { client?: IfoodClient; now?: Date } = {}): Promise<{ synced: boolean; changed: boolean }> {
+  const skip = { synced: false, changed: false };
+  if (!can(actor.role, "conference.write")) return skip;
+  if (!options.client && !ifoodConfigFromEnv()) return skip;
+  const now = options.now ?? new Date();
+  const claimed = await prisma.platformIntegration.updateMany({
+    where: {
+      restaurantId: actor.restaurantId,
+      provider: "IFOOD",
+      enabled: true,
+      merchantId: { not: null },
+      OR: [{ lastSyncAt: null }, { lastSyncAt: { lt: new Date(now.getTime() - IFOOD_AUTO_SYNC_MS) } }],
+    },
+    data: { lastSyncAt: now },
+  });
+  if (claimed.count === 0) return skip;
+  try {
+    const r = await syncIfoodNow(actor, { client: options.client, quiet: true, now });
+    return { synced: true, changed: r.newEvents > 0 || r.ordersSaved > 0 };
+  } catch {
+    // o erro já ficou registrado em lastSyncInfo e na auditoria
+    return { synced: true, changed: true };
+  }
+}
+
 /** Busca agora os pedidos novos do iFood. Qualquer um que confere o caixa pode disparar. */
-export async function syncIfoodNow(actor: Actor, options: { client?: IfoodClient } = {}): Promise<SyncResult> {
+export async function syncIfoodNow(actor: Actor, options: { client?: IfoodClient; quiet?: boolean; now?: Date } = {}): Promise<SyncResult> {
   assertCan(actor, "conference.write");
   const config = ifoodConfigFromEnv();
   if (!options.client && !config) {
@@ -86,9 +120,10 @@ export async function syncIfoodNow(actor: Actor, options: { client?: IfoodClient
     const info = summarize(result);
     await prisma.platformIntegration.update({
       where: { id: integration.id },
-      data: { lastSyncAt: new Date(), lastSyncOk: result.failedOrders.length === 0, lastSyncInfo: info },
+      data: { lastSyncAt: options.now ?? new Date(), lastSyncOk: result.failedOrders.length === 0, lastSyncInfo: info },
     });
-    await audit(prisma, actor, {
+    // busca automática sem nada novo não enche a auditoria; falha e busca com pedidos ficam registradas
+    if (!options.quiet || result.events > 0 || result.failedOrders.length > 0) await audit(prisma, actor, {
       action: "integration.ifood.sync",
       entity: "platform_integration",
       entityId: integration.id,
@@ -99,7 +134,7 @@ export async function syncIfoodNow(actor: Actor, options: { client?: IfoodClient
     const message = (err as Error).message.slice(0, 500);
     await prisma.platformIntegration.update({
       where: { id: integration.id },
-      data: { lastSyncAt: new Date(), lastSyncOk: false, lastSyncInfo: message },
+      data: { lastSyncAt: options.now ?? new Date(), lastSyncOk: false, lastSyncInfo: message },
     });
     await audit(prisma, actor, { action: "integration.ifood.sync_failed", entity: "platform_integration", entityId: integration.id, newValue: { error: message } });
     throw new ServiceError(`Não foi possível buscar os pedidos do iFood: ${message}`, "STATE");

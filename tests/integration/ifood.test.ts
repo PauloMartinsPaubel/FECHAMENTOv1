@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { prisma } from "@/server/db";
 import { bootstrap, Env } from "./setup";
 import { IfoodClient } from "@/server/integrations/ifood/client";
-import { ifoodShiftComparison, listIfoodMerchants, saveIfoodSettings, syncIfoodNow } from "@/server/services/integrations";
+import { autoSyncIfood, ifoodShiftComparison, listIfoodMerchants, saveIfoodSettings, syncIfoodNow } from "@/server/services/integrations";
 import { openSession } from "@/server/services/sessions";
 import { createMovement } from "@/server/services/movements";
 import { ifoodEvent, ifoodOrder } from "../fixtures/ifood";
@@ -258,6 +258,23 @@ describe("sincronização", () => {
     expect(fake.acked).toContain("ev-x");
     expect(fake.calls.filter((x) => x.startsWith("POST /order"))).toHaveLength(1);
     fake.route = "events";
+  });
+
+  it("busca automática ao abrir a tela: no máximo 1 vez por minuto, sem erro e sem encher a auditoria", async () => {
+    const audits = () => prisma.auditLog.count({ where: { action: "integration.ifood.sync" } });
+    const t0 = new Date(Date.now() + 10 * 60_000);
+    const before = await audits();
+    const tokens = fake.tokens;
+    expect(await autoSyncIfood(env.operator, { client: client(), now: t0 })).toEqual({ synced: true, changed: false });
+    expect(await audits()).toBe(before); // nada novo: não registra
+    // 30 s depois: não busca de novo
+    expect(await autoSyncIfood(env.operator, { client: client(), now: new Date(t0.getTime() + 30_000) })).toEqual({ synced: false, changed: false });
+    expect(fake.tokens).toBe(tokens + 1);
+    // com pedido novo, 61 s depois: busca e avisa a tela para atualizar
+    fake.orders.set("pedido-E", ifoodOrder({ id: "pedido-E", displayId: "1005", createdAt: "2026-10-05T16:00:00Z", orderAmount: 10, methods: [{ value: 10, method: "PIX", type: "ONLINE" }] }));
+    fake.pending.push(ifoodEvent("ev-10", "PLC", "pedido-E"));
+    expect(await autoSyncIfood(env.operator, { client: client(), now: new Date(t0.getTime() + 65_000) })).toEqual({ synced: true, changed: true });
+    expect(await audits()).toBe(before + 1);
   });
 
   it("os eventos e pedidos da plataforma não podem ser apagados", async () => {
