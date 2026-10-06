@@ -5,6 +5,7 @@ import { can } from "@/lib/permissions";
 import { Alert, Badge, Empty, PageHeader } from "@/components/ui";
 import { IfoodSyncButton } from "@/components/ifood-sync-button";
 import { IfoodAutoSync } from "@/components/ifood-auto-sync";
+import { IfoodReportUpload } from "@/components/ifood-report-upload";
 import { clientIp, requirePermission } from "@/server/auth/current";
 import { prisma } from "@/server/db";
 import { getIfoodIntegration, listRecentPlatformOrders } from "@/server/services/integrations";
@@ -36,15 +37,11 @@ export default async function IntegrationsPage() {
           {row?.enabled ? <Badge kind="CORRETO">Ligada</Badge> : <Badge kind="CLOSED">Desligada</Badge>}
         </div>
         <Alert tone="info">
-          Fase 1: o sistema só <strong>lê</strong> os pedidos do iFood e mostra a comparação na aba Conferência de cada caixa.
+          O sistema só <strong>lê</strong> os pedidos do iFood e mostra a comparação na aba Conferência de cada caixa.
           Nada é lançado sozinho no caixa, e o seu gestor de pedidos do iFood continua funcionando como hoje.
+          Para trazer os pedidos, exporte no Portal do Parceiro (Pedidos, Exportar; depois Relatórios, Exportações, Baixar)
+          e envie o arquivo aqui ou na Conferência do caixa. Pode enviar o mesmo dia mais de uma vez: nada é duplicado.
         </Alert>
-        {!credentialsConfigured ? (
-          <Alert tone="warn">
-            Credenciais do iFood ainda não configuradas no servidor. Quando o iFood liberar a conta de desenvolvedor,
-            cadastre <code>IFOOD_CLIENT_ID</code> e <code>IFOOD_CLIENT_SECRET</code> nas variáveis de ambiente da Vercel e faça um novo deploy.
-          </Alert>
-        ) : null}
 
         {can(user.role, "settings.manage") ? (
           <IfoodSettingsForm merchantId={row?.merchantId ?? ""} channelId={row?.channelId ?? ifoodChannel?.id ?? channels[0]?.id ?? ""} enabled={row?.enabled ?? false} channels={channels.map((c) => ({ id: c.id, name: c.name }))} credentialsConfigured={credentialsConfigured} />
@@ -53,7 +50,8 @@ export default async function IntegrationsPage() {
         )}
 
         <div className="flex flex-wrap items-center gap-3 border-t border-stone-200 pt-4">
-          {row?.enabled && credentialsConfigured && can(user.role, "conference.write") ? <><IfoodAutoSync /><IfoodSyncButton /></> : null}
+          {row?.enabled && credentialsConfigured && row.merchantId && can(user.role, "conference.write") ? <><IfoodAutoSync /><IfoodSyncButton /></> : null}
+          {row?.enabled && can(user.role, "conference.write") ? <IfoodReportUpload /> : null}
           <p className="text-sm text-stone-600">
             Última busca: {row?.lastSyncAt ? formatDateTimeBR(row.lastSyncAt) : "nunca"}
             {row?.lastSyncInfo ? <span className={row.lastSyncOk === false ? "text-red-700" : ""}> · {row.lastSyncInfo}</span> : null}

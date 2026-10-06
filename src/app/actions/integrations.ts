@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { errorMessage } from "@/server/errors";
+import { errorMessage, ServiceError } from "@/server/errors";
 import type { IfoodMerchant } from "@/server/integrations/ifood/client";
-import { autoSyncIfood, listIfoodMerchants, saveIfoodSettings, syncIfoodNow } from "@/server/services/integrations";
+import { autoSyncIfood, importIfoodReport, listIfoodMerchants, saveIfoodSettings, syncIfoodNow } from "@/server/services/integrations";
 import type { ActionState } from "./types";
 import { actorFromSession, bool, optStr, run, str } from "./util";
 
@@ -50,4 +50,21 @@ export async function autoSyncIfoodAction(): Promise<{ changed: boolean }> {
     if (err && typeof err === "object" && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
     return { changed: false };
   }
+}
+
+export async function importIfoodReportAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  return run(async () => {
+    const actor = await actorFromSession();
+    const file = fd.get("report");
+    if (!(file instanceof File) || file.size === 0) throw new ServiceError("Escolha o arquivo do relatório de pedidos do iFood (.xlsx).");
+    const r = await importIfoodReport(actor, { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) });
+    revalidatePath("/integracoes");
+    const sessionId = optStr(fd, "sessionId");
+    if (sessionId) revalidatePath(`/caixa/${sessionId}`, "layout");
+    const parts = [`${r.rows} pedido(s) lido(s): ${r.created} novo(s), ${r.updated} atualizado(s)`];
+    if (r.cancelled) parts.push(`${r.cancelled} cancelado(s)`);
+    if (r.errors.length) parts.push(`${r.errors.length} linha(s) com erro: ${r.errors.slice(0, 3).join(" ")}`);
+    if (r.warnings.length) parts.push(`avisos: ${r.warnings.slice(0, 3).join(" ")}`);
+    return parts.join("; ") + ".";
+  });
 }

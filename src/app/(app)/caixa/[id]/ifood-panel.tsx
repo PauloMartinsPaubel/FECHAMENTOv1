@@ -3,21 +3,28 @@ import { formatBRL, KIND_LABEL, type PaymentKind } from "@/lib/finance";
 import { Diff } from "@/components/ui";
 import { IfoodSyncButton } from "@/components/ifood-sync-button";
 import { IfoodAutoSync } from "@/components/ifood-auto-sync";
+import { IfoodReportUpload } from "@/components/ifood-report-upload";
 import type { IfoodShiftComparison } from "@/server/services/integrations";
 
 /** Painel na Conferência: o que o iFood registrou neste turno x o que foi lançado no caixa. */
-export function IfoodPanel({ c, sessionId, canSync }: { c: IfoodShiftComparison; sessionId: string; canSync: boolean }) {
+export function IfoodPanel({ c, sessionId, canSync, apiConfigured }: { c: IfoodShiftComparison; sessionId: string; canSync: boolean; apiConfigured: boolean }) {
   const offline = Object.entries(c.platformOfflineByKind) as [PaymentKind, number][];
   const d = c.onlineDifferenceCents;
   return (
     <section className="card space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-bold">Pedidos do iFood neste turno</h2>
-        {canSync ? <><IfoodAutoSync /><IfoodSyncButton sessionId={sessionId} /></> : null}
+        {canSync && apiConfigured ? <><IfoodAutoSync /><IfoodSyncButton sessionId={sessionId} /></> : null}
       </div>
+      {canSync ? (
+        <div className="space-y-1">
+          <IfoodReportUpload sessionId={sessionId} />
+          <p className="text-xs text-stone-500">No Portal do Parceiro: Pedidos, Exportar, e depois Relatórios, Exportações, Baixar. Pode enviar o mesmo dia mais de uma vez: nada é duplicado.</p>
+        </div>
+      ) : null}
       <p className="text-xs text-stone-500">
         {c.activeCount} pedido(s) válido(s){c.cancelledCount ? `, ${c.cancelledCount} cancelado(s) (${formatBRL(c.cancelledCents)}, fora da conta)` : ""}.
-        Última busca: {c.lastSyncAt ? formatDateTimeBR(c.lastSyncAt) : "nunca"}.
+        {c.lastSyncInfo ?? `Última busca: ${c.lastSyncAt ? formatDateTimeBR(c.lastSyncAt) : "nunca"}.`}
       </p>
 
       <div className="grid gap-2 sm:grid-cols-3">

@@ -36,7 +36,7 @@ export function IfoodSettingsForm({
 
   return (
     <ActionForm action={saveIfoodSettingsAction} className="grid gap-4 sm:grid-cols-2">
-      <Field label="Código da loja no iFood (merchantId)" htmlFor="merchantId" hint="Use o botão abaixo para buscar direto no iFood. Não é senha.">
+      <Field label="Código da loja no iFood (merchantId, opcional)" htmlFor="merchantId" hint="Só para a busca pela API do iFood. Para importar o relatório, pode deixar em branco.">
         <input id="merchantId" name="merchantId" value={value} onChange={(e) => setValue(e.target.value)} className="input" autoComplete="off" maxLength={100} />
       </Field>
       <Field label="Canal do caixa que recebe os pedidos" htmlFor="channelId">
@@ -76,7 +76,7 @@ export function IfoodSettingsForm({
       ) : null}
 
       <label className="flex items-center gap-2 text-sm sm:col-span-2">
-        <input type="checkbox" name="enabled" defaultChecked={enabled} /> Integração ligada
+        <input type="checkbox" name="enabled" defaultChecked={enabled} /> Conferência do iFood ligada
       </label>
       <div className="sm:col-span-2"><button type="submit" className="btn-primary">Salvar</button></div>
     </ActionForm>

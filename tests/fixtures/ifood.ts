@@ -31,3 +31,45 @@ export function ifoodOrder(over: Partial<{
 export function ifoodEvent(id: string, code: string, orderId: string, createdAt = "2026-10-06T15:30:05.000Z", merchantId = "loja-123") {
   return { id, code, fullCode: code, orderId, merchantId, createdAt };
 }
+
+/** Cabeçalho do "Relatório de Pedidos" do Portal do Parceiro, como no arquivo real de 06/10/2026. */
+export const REPORT_HEADER = [
+  "ID COMPLETO DO PEDIDO", "NOME DA LOJA", "ID DA LOJA", "DATA E HORA DO PEDIDO", "TURNO", "ID CURTO DO PEDIDO",
+  "STATUS FINAL DO PEDIDO", "VALOR DOS ITENS (R$)", "TOTAL PAGO PELO CLIENTE (R$)", "TAXA DE ENTREGA PAGA PELO CLIENTE (R$)",
+  "INCENTIVO PROMOCIONAL DO IFOOD (R$)", "INCENTIVO PROMOCIONAL DA LOJA (R$)", "INCENTIVO PROMOCIONAL DA REDE (R$)",
+  "TAXA DE SERVIÇO (R$)", "TAXAS E COMISSOES (R$)", "VALOR LIQUIDO (R$)", "FORMA DE PAGAMENTO", "TIPO DE ENTREGA",
+  "PRODUTO LOGISTICO", "CANAL DE VENDA",
+];
+
+export function reportRow(o: { id: string; short: string; when: string; status?: string; total: number | string; payment: string; items?: number; delivery?: number; incStore?: number; channel?: string }) {
+  return [
+    o.id, "A Feijoada", 42689, o.when, "ALMOÇO", o.short, o.status ?? "CONCLUIDO", o.items ?? 50, o.total, o.delivery ?? 9.9,
+    0, o.incStore ?? 0, 0, 1.16, "", "", o.payment, "ENTREGA", "ENTREGA PROPRIA", o.channel ?? "iFood",
+  ];
+}
+
+/** Gera um .xlsx mínimo (strings compartilhadas para texto, número para número), como o Excel grava. */
+export async function makeXlsx(rows: (string | number)[][]): Promise<Uint8Array> {
+  const { zipSync, strToU8 } = await import("fflate");
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const shared: string[] = [];
+  const col = (i: number) => (i >= 26 ? String.fromCharCode(64 + Math.floor(i / 26)) : "") + String.fromCharCode(65 + (i % 26));
+  const sheetRows = rows
+    .map((r, ri) => `<row r="${ri + 1}">${r
+      .map((v, ci) => {
+        const ref = `${col(ci)}${ri + 1}`;
+        if (v === "") return "";
+        if (typeof v === "number") return `<c r="${ref}"><v>${v}</v></c>`;
+        shared.push(v);
+        return `<c r="${ref}" t="s"><v>${shared.length - 1}</v></c>`;
+      })
+      .join("")}</row>`)
+    .join("");
+  const ns = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
+  return zipSync({
+    "[Content_Types].xml": strToU8("<Types/>"),
+    "xl/workbook.xml": strToU8(`<workbook ${ns}><sheets><sheet name="Pedidos" sheetId="1"/></sheets></workbook>`),
+    "xl/sharedStrings.xml": strToU8(`<sst ${ns}>${shared.map((s) => `<si><t>${esc(s)}</t></si>`).join("")}</sst>`),
+    "xl/worksheets/sheet1.xml": strToU8(`<worksheet ${ns}><sheetData>${sheetRows}</sheetData></worksheet>`),
+  });
+}

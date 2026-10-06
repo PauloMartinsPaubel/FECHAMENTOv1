@@ -4,10 +4,10 @@ import type { AddressInfo } from "node:net";
 import { prisma } from "@/server/db";
 import { bootstrap, Env } from "./setup";
 import { IfoodClient } from "@/server/integrations/ifood/client";
-import { autoSyncIfood, ifoodShiftComparison, listIfoodMerchants, saveIfoodSettings, syncIfoodNow } from "@/server/services/integrations";
+import { autoSyncIfood, ifoodShiftComparison, importIfoodReport, listIfoodMerchants, saveIfoodSettings, syncIfoodNow } from "@/server/services/integrations";
 import { openSession } from "@/server/services/sessions";
 import { createMovement } from "@/server/services/movements";
-import { ifoodEvent, ifoodOrder } from "../fixtures/ifood";
+import { ifoodEvent, ifoodOrder, makeXlsx, REPORT_HEADER, reportRow } from "../fixtures/ifood";
 
 /** Servidor que imita a Merchant API do iFood, com estado controlado pelo teste. */
 class FakeIfood {
@@ -105,9 +105,8 @@ afterAll(async () => {
 });
 
 describe("configuração", () => {
-  it("só o administrador configura; ligar exige o código da loja", async () => {
+  it("só o administrador configura", async () => {
     await expect(saveIfoodSettings(env.manager, { merchantId: "loja-123", channelId: env.ch("iFood"), enabled: true })).rejects.toMatchObject({ code: "FORBIDDEN" });
-    await expect(saveIfoodSettings(env.admin, { merchantId: "", channelId: env.ch("iFood"), enabled: true })).rejects.toThrow(/merchantId/);
     const s = await saveIfoodSettings(env.admin, { merchantId: "loja-123", channelId: env.ch("iFood"), enabled: true });
     expect(s).toMatchObject({ merchantId: "loja-123", enabled: true });
   });
@@ -318,5 +317,61 @@ describe("conferência do turno com o iFood", () => {
     const s = await prisma.cashSession.findFirstOrThrow();
     expect(await ifoodShiftComparison(env.manager, s.id)).toBeNull();
     await expect(syncIfoodNow(env.operator, { client: client() })).rejects.toThrow(/desligada/);
+  });
+});
+
+describe("importação do relatório do Portal do Parceiro", () => {
+  const xlsx = (rows: (string | number)[][]) => makeXlsx([REPORT_HEADER, ...rows]);
+
+  it("desligada, recusa; ligada sem merchantId, importa e mostra na conferência do turno", async () => {
+    const file = { name: "relatorio.xlsx", bytes: await xlsx([reportRow({ id: "r-1", short: "8419", when: "04/10/2026 12:42:49", total: 118.39, payment: "Pgto via APP - Crédito (Visa)" })]) };
+    await expect(importIfoodReport(env.operator, file)).rejects.toThrow(/desligada/);
+    await saveIfoodSettings(env.admin, { merchantId: "", channelId: env.ch("iFood"), enabled: true });
+
+    const r = await importIfoodReport(env.operator, {
+      name: "relatorio.xlsx",
+      bytes: await xlsx([
+        reportRow({ id: "r-1", short: "8419", when: "04/10/2026 12:42:49", status: "DISPATCHED", total: 118.39, payment: "Pgto via APP - Crédito (Visa)" }),
+        reportRow({ id: "r-2", short: "4629", when: "04/10/2026 13:08:10", total: 71.06, payment: "Dinheiro" }),
+        reportRow({ id: "r-3", short: "5000", when: "04/10/2026 13:30:00", status: "CANCELADO", total: 50, payment: "Pgto via APP - PIX" }),
+        reportRow({ id: "r-4", short: "6000", when: "04/10/2026 20:00:00", total: 30, payment: "Pgto via APP - PIX" }),
+      ]),
+    });
+    expect(r).toMatchObject({ rows: 4, created: 4, updated: 0, cancelled: 1, errors: [] });
+
+    const { session } = await openSession(env.manager, {
+      registerId: env.registers[0].id, shiftId: env.morning.id, businessDate: "2026-10-04", openingFloatCents: 10000, floatMode: "NEW_OPENING",
+    });
+    await createMovement(env.manager, session.id, {
+      type: "VENDA", amountCents: 11839, orderNumber: "8419", channelId: env.ch("iFood"), paymentMethodId: env.pm("Pagamento online"),
+    });
+    const c = await ifoodShiftComparison(env.manager, session.id);
+    expect(c!).toMatchObject({ activeCount: 2, cancelledCount: 1, cancelledCents: 5000, platformOnlineCents: 11839, systemOnlineCents: 11839, onlineDifferenceCents: 0, merchantConfigured: false });
+    expect(c!.platformOfflineByKind).toEqual({ CASH: 7106 });
+    expect(c!.lastSyncInfo).toMatch(/Relatório importado: 4 pedido/);
+  });
+
+  it("enviar de novo (ou um período maior) atualiza sem duplicar; cancelado não volta", async () => {
+    const r = await importIfoodReport(env.operator, {
+      name: "relatorio-dia-todo.xlsx",
+      bytes: await xlsx([
+        reportRow({ id: "r-1", short: "8419", when: "04/10/2026 12:42:49", status: "CONCLUIDO", total: 118.39, payment: "Pgto via APP - Crédito (Visa)" }),
+        reportRow({ id: "r-2", short: "4629", when: "04/10/2026 13:08:10", status: "CANCELADO", total: 71.06, payment: "Dinheiro" }),
+        reportRow({ id: "r-3", short: "5000", when: "04/10/2026 13:30:00", status: "CONCLUIDO", total: 50, payment: "Pgto via APP - PIX" }),
+        reportRow({ id: "r-5", short: "7000", when: "04/10/2026 21:00:00", total: 20, payment: "Pgto via APP - PIX" }),
+      ]),
+    });
+    expect(r).toMatchObject({ rows: 4, created: 1, updated: 3, cancelled: 1 });
+    expect(await prisma.platformOrder.count({ where: { externalId: { startsWith: "r-" } } })).toBe(5);
+    expect((await prisma.platformOrder.findFirstOrThrow({ where: { externalId: "r-1" } })).status).toBe("CONCLUDED");
+    expect((await prisma.platformOrder.findFirstOrThrow({ where: { externalId: "r-2" } })).status).toBe("CANCELLED");
+    expect((await prisma.platformOrder.findFirstOrThrow({ where: { externalId: "r-3" } })).status).toBe("CANCELLED");
+    expect(await prisma.auditLog.count({ where: { action: "integration.ifood.report_import" } })).toBe(2);
+  });
+
+  it("arquivo errado ou vazio vira mensagem clara", async () => {
+    await expect(importIfoodReport(env.operator, { name: "x.xlsx", bytes: new TextEncoder().encode("nada") })).rejects.toThrow(/xlsx válida/);
+    await expect(importIfoodReport(env.operator, { name: "x.xlsx", bytes: await makeXlsx([["NOME", "VALOR"]]) })).rejects.toThrow(/Relatório de Pedidos/);
+    await expect(importIfoodReport(env.operator, { name: "x.xlsx", bytes: await xlsx([]) })).rejects.toThrow(/não tem pedidos/);
   });
 });

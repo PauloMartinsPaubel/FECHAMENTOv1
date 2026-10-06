@@ -6,6 +6,7 @@ import { ConferenceForm } from "../conference-form";
 import { ConferenceTable } from "../conference-table";
 import { IfoodPanel } from "../ifood-panel";
 import { ifoodShiftComparison } from "@/server/services/integrations";
+import { ifoodConfigFromEnv } from "@/server/integrations/ifood/client";
 import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Conferência de valores" };
@@ -15,7 +16,7 @@ export default async function ConferencePage({ params }: { params: Promise<{ id:
   const { bundle, editMode, actor } = await getSessionPage(id);
   const { evaluation: ev, session, settings } = bundle;
   const ifood = await ifoodShiftComparison(actor, id).catch(() => null);
-  const ifoodPanel = ifood ? <IfoodPanel c={ifood} sessionId={id} canSync={Boolean(editMode) && can(actor.role, "conference.write")} /> : null;
+  const ifoodPanel = ifood ? <IfoodPanel c={ifood} sessionId={id} canSync={Boolean(editMode) && can(actor.role, "conference.write")} apiConfigured={ifoodConfigFromEnv() !== null && Boolean(ifood.merchantConfigured)} /> : null;
 
   if (!editMode) {
     return (

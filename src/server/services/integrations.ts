@@ -1,4 +1,5 @@
-import { fromDbDate, toDbDate } from "@/lib/dates";
+import type { Prisma } from "@/generated/prisma/client";
+import { APP_TIMEZONE, fromDbDate, toDbDate } from "@/lib/dates";
 import type { PaymentKind } from "@/lib/finance";
 import { can } from "@/lib/permissions";
 import { Actor, assertCan } from "../actor";
@@ -7,7 +8,8 @@ import { prisma } from "../db";
 import { ServiceError } from "../errors";
 import { IfoodClient, ifoodConfigFromEnv, IfoodMerchant } from "../integrations/ifood/client";
 import { SyncResult, syncIfoodOnce } from "../integrations/ifood/sync";
-import { assignShift, NormalizedPayment } from "../integrations/shared";
+import { parseIfoodOrdersReport, readXlsxRows } from "../integrations/ifood/report";
+import { assignShift, laterStatus, NormalizedPayment, type OrderStatus } from "../integrations/shared";
 import { loadSessionBundle } from "../loaders";
 import { assertSessionAccess } from "./sessions";
 
@@ -35,7 +37,6 @@ export async function listIfoodMerchants(actor: Actor, options: { client?: Ifood
 export async function saveIfoodSettings(actor: Actor, input: { merchantId: string; channelId: string; enabled: boolean }) {
   assertCan(actor, "settings.manage");
   const merchantId = input.merchantId.trim();
-  if (input.enabled && !merchantId) throw new ServiceError("Informe o código da loja no iFood (merchantId) para ligar a integração.");
   if (merchantId.length > 100) throw new ServiceError("Código da loja longo demais.");
   const channel = await prisma.salesChannel.findFirst({ where: { id: input.channelId, restaurantId: actor.restaurantId } });
   if (!channel) throw new ServiceError("Escolha o canal do caixa que recebe os pedidos do iFood.");
@@ -67,6 +68,113 @@ function summarize(r: SyncResult): string {
   if (r.failedOrders.length) parts.push(`${r.failedOrders.length} com falha (tentaremos de novo na próxima busca)`);
   if (r.warnings.length) parts.push(`${r.warnings.length} aviso(s) de leitura`);
   return parts.join(", ") + ".";
+}
+
+export interface ReportImportResult {
+  rows: number;
+  created: number;
+  updated: number;
+  cancelled: number;
+  errors: string[];
+  warnings: string[];
+}
+
+export const MAX_REPORT_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Importa o "Relatório de Pedidos" exportado no Portal do Parceiro. Pode importar o mesmo arquivo, ou um
+ * período que se sobrepõe, quantas vezes quiser: o pedido é identificado pelo ID completo do iFood (o mesmo
+ * da API) e é atualizado, nunca duplicado. Status só avança; cancelado nunca volta.
+ */
+export async function importIfoodReport(actor: Actor, file: { name: string; bytes: Uint8Array }): Promise<ReportImportResult> {
+  assertCan(actor, "conference.write");
+  const integration = await prisma.platformIntegration.findUnique({
+    where: { restaurantId_provider: { restaurantId: actor.restaurantId, provider: "IFOOD" } },
+  });
+  if (!integration?.enabled || !integration.channelId) {
+    throw new ServiceError("A conferência do iFood está desligada. Um administrador liga em Integrações e escolhe o canal iFood.", "STATE");
+  }
+  if (file.bytes.length === 0) throw new ServiceError("Arquivo vazio.");
+  if (file.bytes.length > MAX_REPORT_BYTES) throw new ServiceError("Arquivo maior que 5 MB. Exporte um período menor.");
+
+  let parsed;
+  try {
+    parsed = parseIfoodOrdersReport(readXlsxRows(file.bytes), APP_TIMEZONE);
+  } catch (err) {
+    throw new ServiceError((err as Error).message);
+  }
+  if (parsed.orders.length === 0) {
+    throw new ServiceError(parsed.errors.length ? `Nenhum pedido pôde ser lido. ${parsed.errors.slice(0, 3).join(" ")}` : "O relatório não tem pedidos.");
+  }
+
+  const shifts = await prisma.shift.findMany({ where: { restaurantId: actor.restaurantId, active: true } });
+  const result: ReportImportResult = { rows: parsed.orders.length, created: 0, updated: 0, cancelled: 0, errors: parsed.errors, warnings: parsed.warnings };
+  const now = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.platformOrder.findMany({
+      where: { provider: "IFOOD", externalId: { in: parsed.orders.map((o) => o.externalId) } },
+    });
+    const byId = new Map(existing.map((e) => [e.externalId, e]));
+    for (const o of parsed.orders) {
+      const { line: _line, status: _status, ...normalized } = o;
+      const data = {
+        displayId: o.displayId,
+        orderType: o.orderType,
+        subtotalCents: o.subtotalCents,
+        deliveryFeeCents: o.deliveryFeeCents,
+        benefitsCents: o.benefitsCents,
+        totalCents: o.totalCents,
+        onlineCents: o.onlineCents,
+        offlineCents: o.offlineCents,
+        payments: o.payments as unknown as Prisma.InputJsonValue,
+        raw: { source: "relatorio", file: file.name.slice(0, 200), ...normalized } as unknown as Prisma.InputJsonValue,
+      };
+      const prev = byId.get(o.externalId);
+      if (!prev) {
+        const { businessDate } = assignShift(o.placedAt, shifts);
+        await tx.platformOrder.create({
+          data: {
+            ...data,
+            restaurantId: actor.restaurantId,
+            provider: "IFOOD",
+            externalId: o.externalId,
+            merchantId: o.merchantId ?? integration.merchantId ?? "relatorio",
+            status: o.status,
+            placedAt: o.placedAt,
+            businessDate: toDbDate(businessDate),
+            cancelledAt: o.status === "CANCELLED" ? now : null,
+            lastEventAt: now,
+          },
+        });
+        result.created++;
+        if (o.status === "CANCELLED") result.cancelled++;
+      } else {
+        if (prev.restaurantId !== actor.restaurantId) {
+          result.errors.push(`Linha ${o.line}: pedido ${o.externalId} pertence a outro restaurante; ignorado.`);
+          continue;
+        }
+        const status = laterStatus(prev.status as OrderStatus, o.status);
+        const becameCancelled = status === "CANCELLED" && prev.status !== "CANCELLED";
+        await tx.platformOrder.update({
+          where: { id: prev.id },
+          data: { ...data, status, cancelledAt: becameCancelled ? now : prev.cancelledAt, lastEventAt: now },
+        });
+        result.updated++;
+        if (becameCancelled) result.cancelled++;
+      }
+    }
+    const info = `Relatório importado: ${result.rows} pedido(s), ${result.created} novo(s), ${result.updated} atualizado(s)${result.errors.length ? `, ${result.errors.length} linha(s) com erro` : ""}.`;
+    await tx.platformIntegration.update({ where: { id: integration.id }, data: { lastSyncInfo: info, lastSyncOk: result.errors.length === 0 } });
+    await audit(tx, actor, {
+      action: "integration.ifood.report_import",
+      entity: "platform_integration",
+      entityId: integration.id,
+      newValue: { file: file.name.slice(0, 200), ...result, errors: result.errors.slice(0, 20), warnings: result.warnings.slice(0, 20) },
+    });
+  }, { timeout: 30_000 });
+
+  return result;
 }
 
 /** Intervalo mínimo entre duas buscas automáticas (abrir a Conferência ou Integrações). */
@@ -171,6 +279,8 @@ export interface IfoodShiftComparison {
   lastSyncAt: string | null;
   lastSyncInfo: string | null;
   lastSyncOk: boolean | null;
+  /** há código da loja para a busca pela API (sem ele, só importação do relatório) */
+  merchantConfigured: boolean;
 }
 
 /**
@@ -236,6 +346,7 @@ export async function ifoodShiftComparison(actor: Actor, sessionId: string): Pro
     systemOnlineCents: systemOnline,
     onlineDifferenceCents: systemOnline - platformOnline,
     lastSyncAt: integration.lastSyncAt?.toISOString() ?? null,
+    merchantConfigured: Boolean(integration.merchantId),
     lastSyncInfo: integration.lastSyncInfo,
     lastSyncOk: integration.lastSyncOk,
   };
