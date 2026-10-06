@@ -1,12 +1,15 @@
 /**
  * Leitura do pedido do iFood (Merchant API, módulo Order v1.0).
  *
- * ATENÇÃO: o formato abaixo foi montado a partir de clientes públicos da API, porque o portal
- * developer.ifood.com.br não estava acessível. Tudo o que depende do formato do pedido está NESTE arquivo
- * e nos testes dele: ao ter acesso à documentação oficial, conferir os nomes dos campos aqui.
+ * Eventos: conferidos com a página Endpoints do módulo Order (id, code, fullCode, orderId, createdAt).
+ * O código pode vir curto ("CFM"), por extenso ("CONFIRMED") ou completo ("ORDER_CONFIRMED").
+ *
+ * Pedido: a página de endpoints mostra só id, status, orderType, category e total. Os campos de valores
+ * abaixo ainda precisam ser conferidos com a página "Estrutura completa do pedido". Tudo o que depende
+ * do formato do pedido está NESTE arquivo e nos testes dele.
  *
  * Campos usados:
- *   id, displayId, createdAt, orderType, merchant.id
+ *   id, displayId, createdAt, orderType, status, merchant.id
  *   total.subTotal, total.deliveryFee, total.benefits, total.additionalFees, total.orderAmount
  *   payments.prepaid, payments.pending, payments.methods[].{value, method, type, card.brand}
  */
@@ -17,9 +20,13 @@ type Json = Record<string, unknown>;
 const obj = (v: unknown): Json => (v && typeof v === "object" && !Array.isArray(v) ? (v as Json) : {});
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
-/** Código do evento (curto ou completo) para o status do pedido. Desconhecido = null (ignorado no status). */
+/**
+ * Código do evento (curto, por extenso ou com prefixo ORDER_) para o status do pedido.
+ * Desconhecido = null (ignorado no status). Pedido de cancelamento e cancelamento recusado
+ * (CANCELLATION_REQUESTED, CANCELLATION_REQUEST_FAILED) NÃO são cancelamento.
+ */
 export function statusFromEventCode(code: string | null | undefined): OrderStatus | null {
-  switch ((code ?? "").toUpperCase()) {
+  switch ((code ?? "").trim().toUpperCase().replace(/^ORDER_/, "")) {
     case "PLC":
     case "PLACED":
       return "PLACED";
@@ -66,6 +73,9 @@ export function cashKindFor(method: string, type: "ONLINE" | "OFFLINE"): Payment
 export interface IfoodEvent {
   id: string;
   code: string;
+  fullCode: string | null;
+  /** status do pedido que este evento indica; null = evento que não muda o status */
+  status: OrderStatus | null;
   orderId: string | null;
   merchantId: string | null;
   createdAt: Date | null;
@@ -75,13 +85,16 @@ export interface IfoodEvent {
 export function mapIfoodEvent(input: unknown): IfoodEvent | null {
   const e = obj(input);
   const id = str(e.id);
-  const code = str(e.code) ?? str(e.fullCode);
+  const fullCode = str(e.fullCode);
+  const code = str(e.code) ?? fullCode;
   if (!id || !code) return null;
   const created = str(e.createdAt);
   const d = created ? new Date(created) : null;
   return {
     id,
     code,
+    fullCode,
+    status: statusFromEventCode(code) ?? statusFromEventCode(fullCode),
     orderId: str(e.orderId),
     merchantId: str(e.merchantId),
     createdAt: d && !Number.isNaN(d.getTime()) ? d : null,
@@ -158,6 +171,7 @@ export function mapIfoodOrder(input: unknown): NormalizedOrder {
     merchantId: str(obj(o.merchant).id),
     placedAt,
     orderType: str(o.orderType),
+    reportedStatus: statusFromEventCode(str(o.status)),
     subtotalCents,
     deliveryFeeCents,
     benefitsCents,

@@ -21,6 +21,9 @@ class FakeIfood {
   /** simula a confirmação perdida: o evento volta mesmo depois de confirmado */
   redeliver = false;
   expireNextToken = false;
+  /** qual das duas rotas de eventos da documentação este "iFood" atende */
+  route: "events" | "orders" = "events";
+  calls: string[] = [];
 
   async start() {
     this.server = http.createServer((req, res) => {
@@ -40,6 +43,7 @@ class FakeIfood {
       res.end(json === undefined ? "" : JSON.stringify(json));
     };
     const url = req.url ?? "";
+    this.calls.push(`${req.method} ${url}`);
     if (url === "/authentication/v1.0/oauth/token") {
       const p = new URLSearchParams(body);
       if (p.get("grantType") !== "client_credentials" || p.get("clientSecret") !== "segredo") return send(401, { message: "invalid" });
@@ -52,14 +56,26 @@ class FakeIfood {
       this.expireNextToken = false;
       return send(401, { message: "token expired" });
     }
-    if (url === "/order/v1.0/events:polling") {
+    const polling = this.route === "events" ? "/events/v1.0/events:polling" : "/order/v1.0/orders:polling";
+    const ack = this.route === "events" ? "/events/v1.0/events/acknowledgment" : "/order/v1.0/orders:acknowledgment";
+    if (url === polling) {
       if (req.headers["x-polling-merchants"] !== "loja-123") return send(400, { message: "merchant" });
       const out = this.pending.filter((e) => this.redeliver || !this.acked.includes((e as { id: string }).id));
+      if (this.route === "orders") return send(200, { events: out });
       return out.length ? send(200, out) : send(204);
     }
-    if (url === "/order/v1.0/events/acknowledgment" && req.method === "POST") {
-      for (const e of JSON.parse(body) as { id: string }[]) this.acked.push(e.id);
-      return send(202);
+    if (url === ack && req.method === "POST") {
+      const parsed = JSON.parse(body) as unknown;
+      // cada rota aceita só o formato de corpo que a sua página da documentação mostra
+      if (this.route === "events") {
+        if (!Array.isArray(parsed)) return send(400, { message: "body" });
+        for (const e of parsed as { id: string }[]) this.acked.push(e.id);
+      } else {
+        const ids = (parsed as { acknowledgedEventIds?: string[] }).acknowledgedEventIds;
+        if (!Array.isArray(ids)) return send(400, { message: "body" });
+        this.acked.push(...ids);
+      }
+      return send(202, { status: "ACCEPTED" });
     }
     const m = url.match(/^\/order\/v1\.0\/orders\/(.+)$/);
     if (m) {
@@ -175,6 +191,50 @@ describe("sincronização", () => {
     fake.expireNextToken = true;
     await expect(c.pollEvents(["loja-123"])).resolves.toBeDefined();
     expect(fake.tokens).toBe(before + 1);
+  });
+
+  it("rota de eventos da página do Order: { events } na busca e acknowledgedEventIds na confirmação", async () => {
+    const D = "pedido-D";
+    fake.route = "orders";
+    fake.calls = [];
+    fake.orders.set(D, { ...ifoodOrder({ id: D, displayId: "1004", createdAt: "2026-10-05T15:45:00Z", orderAmount: 20, methods: [{ value: 20, method: "PIX", type: "ONLINE" }] }), status: "CONFIRMED" });
+    fake.pending.push({ id: "ev-7", code: "PLACED", fullCode: "ORDER_PLACED", orderId: D, createdAt: "2026-10-05T15:45:02Z", metadata: {} });
+    const r = await syncIfoodNow(env.operator, { client: client() });
+    expect(r).toMatchObject({ eventsRoute: "orders", newEvents: 1, ordersSaved: 1, failedOrders: [] });
+    expect(fake.acked).toContain("ev-7");
+    // tentou a rota do módulo Events, recebeu 404 e passou para a outra
+    expect(fake.calls).toEqual(expect.arrayContaining(["GET /events/v1.0/events:polling", "GET /order/v1.0/orders:polling", "POST /order/v1.0/orders:acknowledgment"]));
+    // o detalhe do pedido diz CONFIRMED: vale mais que o PLACED do evento
+    expect((await prisma.platformOrder.findFirstOrThrow({ where: { externalId: D } })).status).toBe("CONFIRMED");
+
+    fake.pending.push({ id: "ev-8", code: "CANCELLED", fullCode: "ORDER_CANCELLED", orderId: D, createdAt: "2026-10-05T15:50:00Z" });
+    fake.pending.push({ id: "ev-9", code: "CANCELLATION_REQUEST_FAILED", orderId: A, createdAt: "2026-10-06T15:50:00Z" });
+    const r2 = await syncIfoodNow(env.operator, { client: client() });
+    expect(r2.cancelled).toBe(1);
+    expect((await prisma.platformOrder.findFirstOrThrow({ where: { externalId: D } })).status).toBe("CANCELLED");
+    // cancelamento recusado não cancela
+    expect((await prisma.platformOrder.findFirstOrThrow({ where: { externalId: A } })).status).toBe("CONFIRMED");
+    fake.route = "events";
+  });
+
+  it("rota fixada por configuração não tenta a outra", async () => {
+    fake.route = "orders";
+    fake.calls = [];
+    const fixed = new IfoodClient({ baseUrl: fake.url, clientId: "cliente", clientSecret: "segredo", eventsRoute: "events" });
+    await expect(fixed.pollEvents(["loja-123"])).rejects.toThrow(/HTTP 404/);
+    expect(fake.calls.filter((c) => c.includes("orders:polling"))).toEqual([]);
+    fake.route = "events";
+  });
+
+  it("confirmação com corpo recusado é reenviada no outro formato", async () => {
+    // rota "events" fixada, mas o servidor só aceita acknowledgedEventIds nela
+    fake.route = "orders";
+    const c = new IfoodClient({ baseUrl: fake.url, clientId: "cliente", clientSecret: "segredo", eventsRoute: "orders" });
+    fake.calls = [];
+    await c.acknowledge(["ev-x"]);
+    expect(fake.acked).toContain("ev-x");
+    expect(fake.calls.filter((x) => x.startsWith("POST /order"))).toHaveLength(1);
+    fake.route = "events";
   });
 
   it("os eventos e pedidos da plataforma não podem ser apagados", async () => {

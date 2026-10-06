@@ -3,9 +3,11 @@ import { toDbDate } from "@/lib/dates";
 import { prisma } from "../../db";
 import { assignShift, laterStatus, NormalizedOrder, OrderStatus } from "../shared";
 import { IfoodClient } from "./client";
-import { IfoodEvent, mapIfoodEvent, mapIfoodOrder, statusFromEventCode } from "./mapper";
+import { IfoodEvent, mapIfoodEvent, mapIfoodOrder } from "./mapper";
 
 export interface SyncResult {
+  /** rota de eventos que respondeu (ver client.ts) */
+  eventsRoute: string;
   events: number;
   newEvents: number;
   ordersSaved: number;
@@ -68,8 +70,7 @@ export async function syncIfoodOnce(restaurantId: string, client: IfoodClient): 
   const lastEventAt = new Map<string, Date>();
   for (const e of mine) {
     if (!e.orderId) continue;
-    const st = statusFromEventCode(e.code);
-    statusByOrder.set(e.orderId, laterStatus(statusByOrder.get(e.orderId), st ?? undefined));
+    statusByOrder.set(e.orderId, laterStatus(statusByOrder.get(e.orderId), e.status));
     if (e.createdAt && (!lastEventAt.get(e.orderId) || e.createdAt > lastEventAt.get(e.orderId)!)) lastEventAt.set(e.orderId, e.createdAt);
   }
 
@@ -85,7 +86,7 @@ export async function syncIfoodOnce(restaurantId: string, client: IfoodClient): 
         normalized = mapIfoodOrder(await client.getOrder(orderId));
         warnings.push(...normalized.warnings.map((w) => `Pedido ${normalized!.displayId ?? orderId}: ${w}`));
       }
-      const finalStatus = laterStatus(existing?.status as OrderStatus | undefined, status);
+      const finalStatus = laterStatus(laterStatus(existing?.status as OrderStatus | undefined, status), normalized?.reportedStatus);
       const isCancel = finalStatus === "CANCELLED" && existing?.status !== "CANCELLED";
       if (isCancel) cancelled++;
 
@@ -135,5 +136,5 @@ export async function syncIfoodOnce(restaurantId: string, client: IfoodClient): 
   const toAck = events.filter((e) => !e.orderId || !failed.has(e.orderId)).map((e) => e.id);
   await client.acknowledge(toAck);
 
-  return { events: events.length, newEvents, ordersSaved, cancelled, acknowledged: toAck.length, failedOrders, warnings };
+  return { eventsRoute: client.eventsRoute, events: events.length, newEvents, ordersSaved, cancelled, acknowledged: toAck.length, failedOrders, warnings };
 }

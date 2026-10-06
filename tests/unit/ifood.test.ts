@@ -83,6 +83,16 @@ describe("eventos e status", () => {
     expect(statusFromEventCode("CONCLUDED")).toBe("CONCLUDED");
     expect(statusFromEventCode("XYZ")).toBeNull();
   });
+  it("código completo com prefixo ORDER_, como no catálogo de eventos", () => {
+    expect(statusFromEventCode("ORDER_CONFIRMED")).toBe("CONFIRMED");
+    expect(statusFromEventCode("ORDER_CANCELLED")).toBe("CANCELLED");
+    expect(statusFromEventCode(" order_placed ")).toBe("PLACED");
+  });
+  it("pedido de cancelamento e cancelamento recusado não cancelam o pedido", () => {
+    expect(statusFromEventCode("CANCELLATION_REQUESTED")).toBeNull();
+    expect(statusFromEventCode("CANCELLATION_REQUEST_FAILED")).toBeNull();
+    expect(statusFromEventCode("ORDER_CANCELLATION_REQUEST_FAILED")).toBeNull();
+  });
   it("status só avança; cancelado vence tudo", () => {
     expect(laterStatus("CONCLUDED", "CONFIRMED")).toBe("CONCLUDED");
     expect(laterStatus("CONCLUDED", "CANCELLED")).toBe("CANCELLED");
@@ -92,6 +102,19 @@ describe("eventos e status", () => {
   it("evento sem id ou código é descartado", () => {
     expect(mapIfoodEvent({ code: "PLC" })).toBeNull();
     expect(mapIfoodEvent({ id: "e1", code: "PLC", orderId: "o1" })).toMatchObject({ id: "e1", orderId: "o1" });
+  });
+  it("evento no formato da documentação: code, fullCode, orderId, createdAt, metadata", () => {
+    const e = mapIfoodEvent({ id: "evt_123", code: "CONFIRMED", fullCode: "ORDER_CONFIRMED", orderId: "ord_456", createdAt: "2024-04-25T18:00:00Z", metadata: {} });
+    expect(e).toMatchObject({ id: "evt_123", code: "CONFIRMED", fullCode: "ORDER_CONFIRMED", status: "CONFIRMED", orderId: "ord_456" });
+    expect(e?.createdAt?.toISOString()).toBe("2024-04-25T18:00:00.000Z");
+  });
+  it("só com fullCode, usa ele; código que não muda status vem com status nulo", () => {
+    expect(mapIfoodEvent({ id: "e2", fullCode: "ORDER_DISPATCHED", orderId: "o" })).toMatchObject({ code: "ORDER_DISPATCHED", status: "DISPATCHED" });
+    expect(mapIfoodEvent({ id: "e3", code: "CANCELLATION_REQUEST_FAILED", orderId: "o" })).toMatchObject({ status: null });
+  });
+  it("o detalhe do pedido informa o próprio status quando informa", () => {
+    expect(mapIfoodOrder(ifoodOrder({ id: "p1" })).reportedStatus).toBeNull();
+    expect(mapIfoodOrder({ ...ifoodOrder({ id: "p2" }), status: "CONFIRMED" }).reportedStatus).toBe("CONFIRMED");
   });
   it("forma do pagamento na entrega para a conferência do caixa", () => {
     expect(cashKindFor("CASH", "OFFLINE")).toBe("CASH");

@@ -49,6 +49,8 @@ export interface NormalizedOrder {
   merchantId: string | null;
   placedAt: Date;
   orderType: string | null;
+  /** status que o próprio detalhe do pedido informa, quando informa */
+  reportedStatus: OrderStatus | null;
   subtotalCents: number;
   deliveryFeeCents: number;
   benefitsCents: number;
