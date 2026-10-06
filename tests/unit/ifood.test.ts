@@ -101,6 +101,29 @@ describe("pedido no formato da página Estrutura do pedido (Logistics)", () => {
   });
 });
 
+describe("exemplo oficial do módulo Order (entrega, pagamento dividido)", () => {
+  const oficial = {
+    id: "63895716-37c3-4372-afd0-3240bfef708d", orderTiming: "IMMEDIATE", orderType: "DELIVERY", salesChannel: "IFOOD", category: "FOOD",
+    displayId: "XPTO", createdAt: "2021-02-16T18:10:27Z", merchant: { id: "c54bb20a", name: "Example Merchant" },
+    total: { subTotal: 3.13, deliveryFee: 5.99, additionalFees: 1, benefits: 1.99, orderAmount: 8.13 },
+    payments: { prepaid: 2.13, pending: 5, methods: [
+      { value: 5, currency: "BRL", method: "CASH ", type: "OFFLINE", prepaid: false },
+      { value: 2.13, currency: "BRL", method: "CREDIT", type: "ONLINE", prepaid: true, card: { brand: "VISA" } },
+    ] },
+    test: false,
+  };
+  it("lê total e pagamentos sem aviso, inclusive o método com espaço sobrando", () => {
+    const o = mapIfoodOrder(oficial);
+    expect(o).toMatchObject({ subtotalCents: 313, deliveryFeeCents: 599, benefitsCents: 199, totalCents: 813, onlineCents: 213, offlineCents: 500 });
+    expect(o.payments.map((p) => [p.method, p.cashKind, p.brand])).toEqual([["CASH", "CASH", null], ["CREDIT", "ONLINE", "VISA"]]);
+    expect(o.warnings).toEqual([]);
+  });
+  it("pedido de outro canal de vendas é avisado", () => {
+    expect(mapIfoodOrder({ ...oficial, salesChannel: "DIGITAL_CATALOG" }).warnings.join()).toContain("DIGITAL_CATALOG");
+    expect(mapIfoodOrder({ ...oficial, test: true }).warnings.join()).toContain("teste");
+  });
+});
+
 describe("eventos e status", () => {
   it("códigos curtos e longos", () => {
     expect(statusFromEventCode("PLC")).toBe("PLACED");

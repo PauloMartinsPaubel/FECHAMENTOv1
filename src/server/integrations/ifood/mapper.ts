@@ -4,11 +4,10 @@
  * Eventos: conferidos com a página Endpoints do módulo Order (id, code, fullCode, orderId, createdAt).
  * O código pode vir curto ("CFM"), por extenso ("CONFIRMED") ou completo ("ORDER_CONFIRMED").
  *
- * Pedido: payments (prepaid, pending, methods[].{value, method, type}), id, displayId, createdAt, isTest e
- * merchant.id conferidos com a página "Estrutura do pedido", que é do módulo Logistics e NÃO traz o bloco total
- * nem a bandeira do cartão. Sem total, o valor sai da soma dos pagamentos. Os campos total.* abaixo ainda
- * precisam ser conferidos com a página do módulo Order. Tudo o que depende do formato do pedido está
- * NESTE arquivo e nos testes dele.
+ * Pedido: conferido com a página "Estrutura do pedido" do módulo Order (total.subTotal, deliveryFee,
+ * additionalFees, benefits, orderAmount; payments.prepaid, pending, methods[].{value, method, type, card.brand}).
+ * O módulo Logistics manda o pedido sem o bloco total: nesse caso o valor sai da soma dos pagamentos.
+ * Tudo o que depende do formato do pedido está NESTE arquivo e nos testes dele.
  *
  * Campos usados:
  *   id, displayId, createdAt, orderType, status, merchant.id
@@ -174,7 +173,11 @@ export function mapIfoodOrder(input: unknown): NormalizedOrder {
     totalCents = onlineCents + offlineCents;
     warnings.push("Pedido sem bloco total; valor calculado pela soma dos pagamentos.");
   }
-  if (o.isTest === true) warnings.push("Pedido de teste do iFood.");
+  if (o.isTest === true || o.test === true) warnings.push("Pedido de teste do iFood.");
+  const salesChannel = str(o.salesChannel);
+  if (salesChannel && salesChannel.toUpperCase() !== "IFOOD") {
+    warnings.push(`Pedido do canal ${salesChannel}, não do app do iFood; confira em qual canal do caixa ele foi lançado.`);
+  }
 
   return {
     externalId,

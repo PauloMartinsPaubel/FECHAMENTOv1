@@ -2,7 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { toDbDate } from "@/lib/dates";
 import { prisma } from "../../db";
 import { assignShift, laterStatus, NormalizedOrder, OrderStatus } from "../shared";
-import { IfoodClient } from "./client";
+import { IfoodClient, IfoodError } from "./client";
 import { IfoodEvent, mapIfoodEvent, mapIfoodOrder } from "./mapper";
 
 export interface SyncResult {
@@ -127,6 +127,13 @@ export async function syncIfoodOnce(restaurantId: string, client: IfoodClient): 
       }
       ordersSaved++;
     } catch (err) {
+      // o iFood guarda o detalhe por 7 dias e o PLACED pode chegar antes dele. 404 depois de 10 minutos do
+      // último evento não vai se resolver: confirma o evento para a fila não travar, e avisa.
+      const last = lastEventAt.get(orderId);
+      if (err instanceof IfoodError && err.status === 404 && last && Date.now() - last.getTime() > 10 * 60_000) {
+        warnings.push(`Pedido ${orderId}: detalhe indisponível no iFood (404) por mais de 10 minutos; evento confirmado sem gravar o pedido.`);
+        continue;
+      }
       failedOrders.push({ orderId, error: (err as Error).message });
     }
   }

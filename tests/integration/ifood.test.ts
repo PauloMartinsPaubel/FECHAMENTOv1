@@ -217,6 +217,17 @@ describe("sincronização", () => {
     fake.route = "events";
   });
 
+  it("detalhe 404 por mais de 10 minutos não trava a fila; recente continua sendo tentado", async () => {
+    fake.pending.push(ifoodEvent("ev-old", "PLC", "sumido", "2020-01-01T00:00:00Z"));
+    fake.pending.push(ifoodEvent("ev-new", "PLC", "novinho", new Date().toISOString()));
+    const r = await syncIfoodNow(env.operator, { client: client() });
+    expect(fake.acked).toContain("ev-old");
+    expect(fake.acked).not.toContain("ev-new");
+    expect(r.failedOrders.map((f) => f.orderId)).toEqual(["novinho"]);
+    expect(r.warnings.join()).toContain("detalhe indisponível");
+    fake.pending = fake.pending.filter((e) => (e as { id: string }).id !== "ev-new");
+  });
+
   it("rota fixada por configuração não tenta a outra", async () => {
     fake.route = "orders";
     fake.calls = [];

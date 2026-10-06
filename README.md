@@ -47,4 +47,4 @@ O sistema busca os pedidos do iFood e mostra, na aba Conferência de cada caixa,
 
 Os eventos (busca e confirmação) seguem a documentação oficial do iFood. Ela traz duas rotas que não batem entre si: `/events/v1.0/events:polling` (módulo Events) e `/order/v1.0/orders:polling` (página Endpoints do módulo Order). O sistema começa pela primeira e, se o iFood responder 403, 404 ou 405, passa para a segunda. Para fixar uma das duas, defina `IFOOD_EVENTS_ROUTE` como `events` ou `orders`. A rota usada em cada busca fica na auditoria.
 
-O formato do pedido do iFood (campos de valores e pagamentos) está isolado em `src/server/integrations/ifood/mapper.ts`, com testes em `tests/unit/ifood.test.ts`. Esses campos ainda precisam ser conferidos com a página "Estrutura completa do pedido" da documentação.
+O formato do pedido do iFood está isolado em `src/server/integrations/ifood/mapper.ts`, conferido com a página "Estrutura do pedido" do módulo Order e testado com o exemplo oficial em `tests/unit/ifood.test.ts`.
