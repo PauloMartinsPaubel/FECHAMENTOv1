@@ -42,6 +42,12 @@ export default async function IntegrationsPage() {
           Para trazer os pedidos, exporte no Portal do Parceiro (Pedidos, Exportar; depois Relatórios, Exportações, Baixar)
           e envie o arquivo aqui ou na Conferência do caixa. Pode enviar o mesmo dia mais de uma vez: nada é duplicado.
         </Alert>
+        {!row?.enabled ? (
+          <Alert tone="warn">
+            A conferência do iFood está desligada, por isso o envio do arquivo ainda não aparece aqui nem na Conferência dos caixas.
+            {can(user.role, "settings.manage") ? " Escolha o canal do iFood abaixo, marque \"Conferência do iFood ligada\" e salve." : " Peça ao administrador para ligar."}
+          </Alert>
+        ) : null}
 
         {can(user.role, "settings.manage") ? (
           <IfoodSettingsForm merchantId={row?.merchantId ?? ""} channelId={row?.channelId ?? ifoodChannel?.id ?? channels[0]?.id ?? ""} enabled={row?.enabled ?? false} channels={channels.map((c) => ({ id: c.id, name: c.name }))} credentialsConfigured={credentialsConfigured} />
