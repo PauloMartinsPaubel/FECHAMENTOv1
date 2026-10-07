@@ -3,7 +3,7 @@ import { ServiceError } from "../errors";
 
 export interface MailAttachment {
   filename: string;
-  content: string;
+  content: string | Buffer;
   contentType: string;
 }
 
@@ -68,7 +68,7 @@ export async function sendMail(msg: MailMessage): Promise<{ messageId: string | 
         subject: msg.subject,
         html: msg.html,
         text: msg.text,
-        attachments: msg.attachments.map((a) => ({ filename: a.filename, content: Buffer.from(a.content, "utf8").toString("base64") })),
+        attachments: msg.attachments.map((a) => ({ filename: a.filename, content: (Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content, "utf8")).toString("base64") })),
       }),
       signal: AbortSignal.timeout(30_000),
     }).catch((err: Error) => {
