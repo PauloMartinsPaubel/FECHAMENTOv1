@@ -28,6 +28,17 @@ body { @apply bg-stone-100 text-stone-900 antialiased; font-family: var(--font-s
 @utility badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold; }
 @utility link { @apply font-medium text-brand-700 underline-offset-2 hover:underline; }
 
+/* Tablet e celular (tela de toque): alvos maiores e texto maior nos campos */
+@media (pointer: coarse) {
+  .input, .input-money { min-height: 3rem; font-size: 1.125rem; }
+  .btn-primary, .btn-secondary, .btn-danger { min-height: 3rem; font-size: 1rem; }
+  .btn-sm { min-height: 2.75rem !important; font-size: 0.875rem !important; }
+  input[type="checkbox"], input[type="radio"] { width: 1.375rem; height: 1.375rem; }
+  nav a { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+}
+.touch-only { display: none; }
+@media (pointer: coarse) { .touch-only { display: inline-flex; } }
+
 @media print {
   body { background: #fff; }
   .no-print { display: none !important; }

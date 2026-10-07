@@ -254,8 +254,10 @@ export function ConferenceForm({
                               const key = String(d.cents);
                               const q = counts[key] ?? "";
                               return (
-                                <li key={key} className="grid grid-cols-[6.5rem_5rem_1fr] items-center gap-2">
+                                <li key={key} className="grid grid-cols-[5.5rem_auto_1fr] items-center gap-2">
                                   <label htmlFor={`count:${key}`} className="text-sm">{d.label}</label>
+                                  <div className="flex items-center gap-1">
+                                  <button type="button" className="touch-only btn-secondary btn-sm w-11 px-0!" aria-label={`Menos uma de ${d.label}`} onClick={() => setCount(key, String(Math.max(0, (Number(q) || 0) - 1)))}>−</button>
                                   <input
                                     id={`count:${key}`}
                                     name={`count:${key}`}
@@ -270,8 +272,11 @@ export function ConferenceForm({
                                     onFocus={(e) => e.currentTarget.select()}
                                     onChange={(e) => setCount(key, e.target.value)}
                                     aria-label={`Quantidade de ${d.kind === "nota" ? "notas" : "moedas"} de ${d.label}`}
+                                    style={{ width: "5rem" }}
                                   />
-                                  <span className="text-right text-sm tabular-nums text-stone-600">{q ? formatBRL(d.cents * (Number(q) || 0)) : ""}</span>
+                                  <button type="button" className="touch-only btn-secondary btn-sm w-11 px-0!" aria-label={`Mais uma de ${d.label}`} onClick={() => setCount(key, String((Number(q) || 0) + 1))}>+</button>
+                                  </div>
+                                  <span className="whitespace-nowrap text-right text-sm tabular-nums text-stone-600">{q ? formatBRL(d.cents * (Number(q) || 0)) : ""}</span>
                                 </li>
                               );
                             })}
