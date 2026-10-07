@@ -10,7 +10,8 @@ import { CatalogRow, NewCatalogItem, SettingsForm, WeeklyNowButton } from "./for
 
 export const metadata: Metadata = { title: "Configurações" };
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const welcome = (await searchParams).inicio === "1";
   const user = await requirePermission("settings.manage");
   const [settings, catalog, restaurant] = await Promise.all([
     getSettings(prisma, user.restaurantId),
@@ -22,6 +23,20 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Configurações" subtitle="Fundo de caixa, tolerância, e-mail e cadastros." />
+
+      {welcome ? (
+        <section className="card border-2 border-brand-600 bg-brand-50">
+          <h2 className="text-lg font-bold">Bem-vindo! Restaurante criado.</h2>
+          <p className="mt-1 text-sm text-stone-700">Já deixamos tudo com os valores mais comuns. Confira estes pontos antes do primeiro caixa:</p>
+          <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm">
+            <li><strong>Fundo e tolerância</strong>: abaixo, em Geral. O fundo padrão é R$ 100,00 e a tolerância começa em zero.</li>
+            <li><strong>Turnos</strong>: Manhã (06:00 às 15:00) e Tarde/Noite (15:00 às 23:59). Ajuste os horários mais abaixo.</li>
+            <li><strong>Caixas, canais e formas de pagamento</strong>: renomeie, desative o que não usa e acrescente o que falta.</li>
+            <li><strong>Equipe</strong>: cadastre gerentes e operadores em <a className="link" href="/usuarios">Usuários</a>.</li>
+            <li><strong>E-mails</strong>: quem recebe o relatório de cada fechamento, os alertas de diferença e o resumo semanal.</li>
+          </ol>
+        </section>
+      ) : null}
 
       <section className="card">
         <h2 className="card-title">Geral</h2>

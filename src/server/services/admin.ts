@@ -15,7 +15,7 @@ import { parseRecipients } from "./email";
 // ---------------------------------------------------------------------------
 
 const NAME_MAX = 100;
-function cleanName(value: string, label = "O nome"): string {
+export function cleanName(value: string, label = "O nome"): string {
   const v = value.trim();
   if (v.length < 2) throw new ServiceError(`${label} precisa ter ao menos 2 letras.`);
   if (v.length > NAME_MAX) throw new ServiceError(`${label} é longo demais.`);

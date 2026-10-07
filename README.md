@@ -52,3 +52,7 @@ O formato do pedido do iFood está isolado em `src/server/integrations/ifood/map
 ## Resumo semanal automático
 
 Toda segunda às 08:00 (horário de Brasília) a Vercel chama `/api/cron/resumo-semanal` (agendado em `vercel.json`). Para funcionar, cadastre na Vercel a variável `CRON_SECRET` com um texto longo e aleatório; sem ela, a rota recusa a chamada. Os destinatários ficam em Configurações, e o botão "Enviar agora o resumo da semana passada" serve para testar.
+
+## Cadastro de restaurante novo
+
+Em `/cadastro` (link na tela de login), um restaurante novo cria a própria conta com o código de convite definido na variável `SIGNUP_CODE` da Vercel. Sem a variável, o cadastro fica fechado. O restaurante nasce com turnos, um caixa, canais, formas de pagamento, bandeiras de ticket e fundo de R$ 100,00, e quem cadastrou vira o administrador. Para trocar o código, edite `SIGNUP_CODE` e faça um novo deploy.

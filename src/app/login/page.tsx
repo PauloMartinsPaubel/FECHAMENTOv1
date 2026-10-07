@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/auth/current";
+import { signupOpen } from "@/server/services/signup";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Entrar" };
@@ -19,6 +21,11 @@ export default async function LoginPage() {
         <div className="card">
           <LoginForm />
         </div>
+        {signupOpen() ? (
+          <p className="mt-4 text-center text-sm text-stone-600">
+            Restaurante novo? <Link href="/cadastro" className="link">Cadastre aqui</Link>
+          </p>
+        ) : null}
       </div>
     </main>
   );

@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import type { PrismaClient } from "@/generated/prisma/client";
+import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 
 export const BCRYPT_COST = 12;
 
@@ -58,6 +58,32 @@ export async function seedBase(prisma: PrismaClient, options: SeedOptions) {
   }
   const restaurantId = restaurant.id;
 
+  await seedRestaurantCatalog(prisma, restaurantId);
+
+  const email = options.adminEmail.trim().toLowerCase();
+  const adminRole = await prisma.role.findUniqueOrThrow({ where: { code: "ADMIN" } });
+  const existingAdmin = await prisma.user.findUnique({ where: { email } });
+  if (!existingAdmin) {
+    await prisma.user.create({
+      data: {
+        restaurantId,
+        roleId: adminRole.id,
+        name: options.adminName ?? "Administrador",
+        email,
+        passwordHash: await bcrypt.hash(options.adminPassword, options.bcryptCost ?? BCRYPT_COST),
+        mustChangePassword: true,
+      },
+    });
+  }
+
+  return { restaurantId };
+}
+
+/**
+ * Cadastros iniciais de um restaurante: turnos, um caixa, canais, formas de pagamento, bandeiras de ticket
+ * e configurações padrão (fundo R$ 100, tolerância zero). Pode rodar de novo: não duplica nada.
+ */
+export async function seedRestaurantCatalog(prisma: Prisma.TransactionClient, restaurantId: string) {
   for (const s of SHIFTS) {
     await prisma.shift.upsert({
       where: { restaurantId_code: { restaurantId, code: s.code } },
@@ -103,21 +129,4 @@ export async function seedBase(prisma: PrismaClient, options: SeedOptions) {
     create: { restaurantId, defaultOpeningFloatCents: 10000, toleranceCents: 0, closingRecipients: [] },
   });
 
-  const email = options.adminEmail.trim().toLowerCase();
-  const adminRole = await prisma.role.findUniqueOrThrow({ where: { code: "ADMIN" } });
-  const existingAdmin = await prisma.user.findUnique({ where: { email } });
-  if (!existingAdmin) {
-    await prisma.user.create({
-      data: {
-        restaurantId,
-        roleId: adminRole.id,
-        name: options.adminName ?? "Administrador",
-        email,
-        passwordHash: await bcrypt.hash(options.adminPassword, options.bcryptCost ?? BCRYPT_COST),
-        mustChangePassword: true,
-      },
-    });
-  }
-
-  return { restaurantId };
 }
