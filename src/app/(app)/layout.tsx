@@ -10,6 +10,7 @@ const NAV: { href: string; label: string; perm?: Permission }[] = [
   { href: "/caixa", label: "Caixa" },
   { href: "/dia", label: "Dia", perm: "reports.view" },
   { href: "/relatorios", label: "Relatórios", perm: "reports.view" },
+  { href: "/tendencias", label: "Tendências", perm: "reports.view" },
   { href: "/historico", label: "Histórico", perm: "history.view" },
   { href: "/divergencias", label: "Divergências", perm: "reports.view" },
   { href: "/cancelamentos", label: "Cancelamentos", perm: "reports.view" },
