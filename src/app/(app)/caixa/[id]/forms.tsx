@@ -5,6 +5,7 @@ import { ActionForm } from "@/components/action-form";
 import { MoneyInput } from "@/components/money-input";
 import { Field } from "@/components/ui";
 import type { ActionState } from "@/app/actions/types";
+import type { SaleShortcut } from "@/lib/sale-shortcuts";
 import {
   addMovementAction,
   addSaleAction,
@@ -55,32 +56,86 @@ function Select({ name, value, onChange, children, required = true, id }: { name
   );
 }
 
-/** Nova venda: canal, forma, bandeira (só ticket), valor e número do pedido. */
-export function SaleForm({ sessionId, catalog, correction }: { sessionId: string; catalog: CatalogView; correction: boolean }) {
+/**
+ * Nova venda: canal, forma, bandeira (só ticket), valor e número do pedido.
+ * Lançamento rápido: os atalhos escolhem canal e forma num toque e levam o cursor ao valor; depois de lançar,
+ * o cursor volta para o valor com a mesma combinação, para a próxima venda ser só "valor + Enter".
+ */
+export function SaleForm({
+  sessionId,
+  catalog,
+  correction,
+  shortcuts = [],
+}: {
+  sessionId: string;
+  catalog: CatalogView;
+  correction: boolean;
+  shortcuts?: SaleShortcut[];
+}) {
+  const start = shortcuts[0];
   const defaultMethod = catalog.methods.find((m) => m.kind === "CASH") ?? catalog.methods[0];
-  const [channelId, setChannelId] = useState(catalog.channels[0]?.id ?? "");
-  const [methodId, setMethodId] = useState(defaultMethod?.id ?? "");
+  const [channelId, setChannelId] = useState(start?.channelId ?? catalog.channels[0]?.id ?? "");
+  const [methodId, setMethodId] = useState(start?.paymentMethodId ?? defaultMethod?.id ?? "");
+  const [brandId, setBrandId] = useState(start?.ticketBrandId ?? "");
   const [n, setN] = useState(0);
   const kind = catalog.methods.find((m) => m.id === methodId)?.kind;
+
+  // foco na hora (sem esperar o próximo quadro), para o primeiro dígito digitado não se perder
+  const focusAmount = () => document.getElementById("amount")?.focus();
+  const pick = (s: SaleShortcut) => {
+    setChannelId(s.channelId);
+    setMethodId(s.paymentMethodId);
+    setBrandId(s.ticketBrandId ?? "");
+    focusAmount();
+  };
+  const isPicked = (s: SaleShortcut) =>
+    s.channelId === channelId && s.paymentMethodId === methodId && (kind !== "TICKET" || (s.ticketBrandId ?? "") === brandId);
 
   return (
     <ActionForm action={addSaleAction} idempotent hidden={{ sessionId }} className="grid gap-3 sm:grid-cols-6">
       {(state) => (
         <>
           <OnSuccess state={state} run={() => setN((x) => x + 1)} />
+          {shortcuts.length > 0 ? (
+            <div className="sm:col-span-6">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">Lançamento rápido</div>
+              <div role="group" aria-label="Atalhos de canal e forma de pagamento" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {shortcuts.map((s) => {
+                  const on = isPicked(s);
+                  return (
+                    <button
+                      key={`${s.channelId}:${s.paymentMethodId}:${s.ticketBrandId ?? ""}`}
+                      type="button"
+                      onClick={() => pick(s)}
+                      aria-pressed={on}
+                      className={`min-h-12 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                        on ? "border-green-700 bg-green-700 text-white" : "border-stone-300 bg-white text-stone-800 hover:border-green-700 hover:bg-green-50"
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1 text-xs text-stone-500">
+                {shortcuts.some((s) => s.uses > 0) ? "As combinações mais lançadas nos últimos 30 dias. " : ""}
+                Toque na combinação, digite o valor e aperte Enter.
+              </p>
+            </div>
+          ) : null}
           <Field label="Canal" htmlFor="channelId" className="sm:col-span-2">
             <Select name="channelId" value={channelId} onChange={setChannelId}>
               {catalog.channels.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
           </Field>
           <Field label="Forma de pagamento" htmlFor="paymentMethodId" className="sm:col-span-2">
-            <Select name="paymentMethodId" value={methodId} onChange={setMethodId}>
+            <Select name="paymentMethodId" value={methodId} onChange={(v) => { setMethodId(v); setBrandId(""); }}>
               {catalog.methods.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </Select>
           </Field>
           {kind === "TICKET" ? (
             <Field label="Bandeira do ticket" htmlFor="ticketBrandId" className="sm:col-span-2">
-              <Select name="ticketBrandId">
+              <Select name="ticketBrandId" value={brandId} onChange={setBrandId}>
                 <option value="">Escolha...</option>
                 {catalog.brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </Select>
@@ -89,7 +144,7 @@ export function SaleForm({ sessionId, catalog, correction }: { sessionId: string
             <div className="hidden sm:col-span-2 sm:block" />
           )}
           <Field label="Valor (R$)" htmlFor="amount" className="sm:col-span-2">
-            <MoneyInput key={`a${n}`} name="amount" required />
+            <MoneyInput key={`a${n}`} name="amount" required autoFocus={n > 0} />
           </Field>
           <Field label="Nº do pedido (opcional)" htmlFor="orderNumber" className="sm:col-span-2">
             <input key={`o${n}`} id="orderNumber" name="orderNumber" maxLength={40} className="input" autoComplete="off" />

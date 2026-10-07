@@ -4,6 +4,7 @@ import { formatBRL } from "@/lib/finance";
 import { MOVEMENT_TYPE_LABEL } from "@/lib/reports/labels";
 import { Alert, Badge, Empty, Money, Stat } from "@/components/ui";
 import { getSessionPage } from "@/server/session-page";
+import { saleShortcuts } from "@/server/services/shortcuts";
 import { CancellationForm, CatalogView, MovementActions, MovementForm, SaleForm } from "./forms";
 import { SummaryStrip } from "./summary-strip";
 
@@ -20,6 +21,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
     brands: catalogRows.brands.filter((b) => b.active).map((b) => ({ id: b.id, name: b.name })),
   };
   const correction = editMode === "correction";
+  const shortcuts = editMode ? await saleShortcuts(session.restaurantId, catalog).catch(() => []) : [];
 
   return (
     <div className="space-y-6">
@@ -36,17 +38,21 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         <Alert tone="info">Este caixa está fechado. Para corrigir algo, um gerente precisa reabri-lo na aba Fechamento, informando o motivo.</Alert>
       ) : null}
 
+      {/* lançar venda vem primeiro: é o que a recepção faz o turno inteiro; o resumo fica logo abaixo */}
+      {editMode ? (
+        <section className="card">
+          <h2 className="card-title">Lançar venda</h2>
+          <SaleForm sessionId={session.id} catalog={catalog} correction={correction} shortcuts={shortcuts} />
+          <p className="mt-3 text-xs text-stone-500">
+            Para lançar vários valores de uma vez (totais por canal e forma), use a aba <strong>Canal x forma</strong>.
+          </p>
+        </section>
+      ) : null}
+
       <SummaryStrip summary={ev.summary} />
 
       {editMode ? (
         <>
-          <section className="card">
-            <h2 className="card-title">Lançar venda</h2>
-            <SaleForm sessionId={session.id} catalog={catalog} correction={correction} />
-            <p className="mt-3 text-xs text-stone-500">
-              Para lançar vários valores de uma vez (totais por canal e forma), use a aba <strong>Canal x forma</strong>.
-            </p>
-          </section>
 
           <section className="card">
             <h2 className="card-title">Sangria, suprimento, despesa, estorno e ajuste</h2>
