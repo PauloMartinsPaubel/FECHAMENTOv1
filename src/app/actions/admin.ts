@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import type { PaymentKind } from "@/generated/prisma/client";
 import type { RoleCode } from "@/lib/permissions";
 import { ServiceError } from "@/server/errors";
+import { formatDateBR } from "@/lib/dates";
+import { sendWeeklySummary } from "@/server/services/weekly";
 import {
   createUser,
   resetUserPassword,
@@ -63,6 +65,7 @@ export async function saveSettingsAction(_p: ActionState, fd: FormData): Promise
       restaurantName: str(fd, "restaurantName"),
       alertRecipients: str(fd, "alertRecipients"),
       alertThresholdCents: moneyField(fd, "alertThreshold", "o limite do alerta"),
+      weeklyRecipients: str(fd, "weeklyRecipients"),
     });
     revalidatePath("/configuracoes");
     return "Configurações salvas.";
@@ -99,5 +102,14 @@ export async function saveCatalogAction(_p: ActionState, fd: FormData): Promise<
     }
     revalidatePath("/configuracoes");
     return id ? "Cadastro atualizado." : "Cadastro criado.";
+  });
+}
+
+export async function sendWeeklyNowAction(_p: ActionState, _fd: FormData): Promise<ActionState> {
+  return run(async () => {
+    const actor = await actorFromSession();
+    const r = await sendWeeklySummary(actor.restaurantId, { manual: actor });
+    if (!r.sent) throw new ServiceError(`O resumo não saiu: ${r.error ?? "erro no envio"}`);
+    return `Resumo da semana de ${formatDateBR(r.week.from)} a ${formatDateBR(r.week.to)} enviado para ${r.to.join(", ")}.`;
   });
 }

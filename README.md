@@ -48,3 +48,7 @@ O sistema busca os pedidos do iFood e mostra, na aba Conferência de cada caixa,
 Os eventos (busca e confirmação) seguem a documentação oficial do iFood. Ela traz duas rotas que não batem entre si: `/events/v1.0/events:polling` (módulo Events) e `/order/v1.0/orders:polling` (página Endpoints do módulo Order). O sistema começa pela primeira e, se o iFood responder 403, 404 ou 405, passa para a segunda. Para fixar uma das duas, defina `IFOOD_EVENTS_ROUTE` como `events` ou `orders`. A rota usada em cada busca fica na auditoria.
 
 O formato do pedido do iFood está isolado em `src/server/integrations/ifood/mapper.ts`, conferido com a página "Estrutura do pedido" do módulo Order e testado com o exemplo oficial em `tests/unit/ifood.test.ts`.
+
+## Resumo semanal automático
+
+Toda segunda às 08:00 (horário de Brasília) a Vercel chama `/api/cron/resumo-semanal` (agendado em `vercel.json`). Para funcionar, cadastre na Vercel a variável `CRON_SECRET` com um texto longo e aleatório; sem ela, a rota recusa a chamada. Os destinatários ficam em Configurações, e o botão "Enviar agora o resumo da semana passada" serve para testar.

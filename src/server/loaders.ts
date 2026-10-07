@@ -37,6 +37,7 @@ export async function getSettings(db: Db, restaurantId: string) {
       emailFrom: null,
       alertRecipients: [] as string[],
       alertThresholdCents: null as number | null,
+      weeklyRecipients: [] as string[],
       updatedAt: new Date(),
     }
   );

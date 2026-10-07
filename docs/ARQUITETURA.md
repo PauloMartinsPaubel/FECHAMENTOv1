@@ -167,6 +167,8 @@ Contagem do dinheiro por cédula e moeda (opcional): na conferência, a pessoa i
 
 Alerta de divergência: em Configurações, o administrador define quem recebe e a partir de qual soma das diferenças (vazio usa a tolerância). Depois que o caixa fecha, o sistema manda um e-mail curto com resultado, origem da diferença, justificativa e link do relatório. O envio roda depois da resposta (`after` do Next), então o fechamento nunca espera nem depende dele. Um alerta por revisão do fechamento; envio e falha ficam na auditoria (`alert.divergence.sent` / `alert.divergence.failed`).
 
+Resumo semanal: toda segunda às 08:00 (horário de Brasília), um Cron da Vercel (`vercel.json`) chama `/api/cron/resumo-semanal`, que só aceita o cabeçalho `Authorization: Bearer <CRON_SECRET>`. Para cada restaurante com destinatários em Configurações, manda o resumo da semana anterior (segunda a domingo, só caixas fechados): faturamento com comparação à semana de antes, por forma, canal e turno, conferência, maiores diferenças, diferenças por responsável, cancelamentos e caixas que ficaram sem fechar. Uma vez por semana e por restaurante (`report.weekly.sent` na auditoria). O botão "Enviar agora" em Configurações manda na hora, para testar ou reenviar.
+
 Estados da sessão: `OPEN` -> `CLOSED` -> `REOPENED` (gerente, motivo obrigatório) -> `CORRECTED` (fechada de novo após correção). `CORRECTED` pode ser reaberta outra vez. Sessão fechada não aceita nenhuma alteração.
 
 ## 6. Telas

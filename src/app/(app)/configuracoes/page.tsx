@@ -6,7 +6,7 @@ import { requirePermission } from "@/server/auth/current";
 import { emailProvider } from "@/server/email/provider";
 import { prisma } from "@/server/db";
 import { getSettings, loadCatalogRows } from "@/server/loaders";
-import { CatalogRow, NewCatalogItem, SettingsForm } from "./forms";
+import { CatalogRow, NewCatalogItem, SettingsForm, WeeklyNowButton } from "./forms";
 
 export const metadata: Metadata = { title: "Configurações" };
 
@@ -35,8 +35,10 @@ export default async function SettingsPage() {
             emailFrom: settings.emailFrom ?? "",
             alertRecipients: settings.alertRecipients.join(", "),
             alertThreshold: settings.alertThresholdCents === null ? "" : formatDecimalComma(settings.alertThresholdCents),
+            weeklyRecipients: settings.weeklyRecipients.join(", "),
           }}
         />
+        {settings.weeklyRecipients.length ? <div className="mt-4"><WeeklyNowButton /></div> : null}
         <div className="mt-4">
           {provider === "none" ? (
             <Alert tone="warn">O envio de e-mail ainda não está configurado no servidor (variável EMAIL_PROVIDER). O fechamento funciona normalmente; o botão de enviar avisa o que falta e permite reenviar depois.</Alert>

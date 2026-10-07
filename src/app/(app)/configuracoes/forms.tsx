@@ -3,14 +3,14 @@
 import { ActionForm } from "@/components/action-form";
 import { MoneyInput } from "@/components/money-input";
 import { Field } from "@/components/ui";
-import { saveCatalogAction, saveSettingsAction } from "@/app/actions/admin";
+import { saveCatalogAction, saveSettingsAction, sendWeeklyNowAction } from "@/app/actions/admin";
 
 export function SettingsForm({
   values,
 }: {
   values: {
     restaurantName: string; defaultOpeningFloat: string; tolerance: string; defaultFloatMode: string; recipients: string; emailFrom: string;
-    alertRecipients: string; alertThreshold: string;
+    alertRecipients: string; alertThreshold: string; weeklyRecipients: string;
   };
 }) {
   return (
@@ -40,10 +40,26 @@ export function SettingsForm({
           <MoneyInput name="alertThreshold" defaultValue={values.alertThreshold} placeholder="usa a tolerância" />
         </Field>
       </fieldset>
+      <fieldset className="grid gap-4 rounded-lg border border-stone-300 p-4 sm:col-span-2">
+        <legend className="px-1 text-sm font-semibold">Resumo semanal</legend>
+        <Field label="Quem recebe o resumo semanal" htmlFor="weeklyRecipients" hint="Toda segunda de manhã: faturamento da semana anterior por forma, canal e turno, comparação com a semana de antes, diferenças por responsável, cancelamentos e caixas não fechados. Vazio desliga.">
+          <input id="weeklyRecipients" name="weeklyRecipients" defaultValue={values.weeklyRecipients} className="input" placeholder="dono@restaurante.com.br" autoComplete="off" />
+        </Field>
+      </fieldset>
       <Field label="Remetente do e-mail (opcional)" htmlFor="emailFrom" hint="Se vazio, usa EMAIL_FROM do servidor." className="sm:col-span-2">
         <input id="emailFrom" name="emailFrom" defaultValue={values.emailFrom} className="input" placeholder="Fechamento de Caixa <caixa@seudominio.com.br>" />
       </Field>
       <div className="sm:col-span-2"><button type="submit" className="btn-primary">Salvar configurações</button></div>
+    </ActionForm>
+  );
+}
+
+/** Manda agora o resumo da semana passada (para testar ou reenviar). Usa a lista salva acima. */
+export function WeeklyNowButton() {
+  return (
+    <ActionForm action={sendWeeklyNowAction} className="flex flex-wrap items-center gap-3">
+      <button type="submit" className="btn-secondary">Enviar agora o resumo da semana passada</button>
+      <span className="text-xs text-stone-500">Usa a lista salva acima. O envio automático continua toda segunda.</span>
     </ActionForm>
   );
 }

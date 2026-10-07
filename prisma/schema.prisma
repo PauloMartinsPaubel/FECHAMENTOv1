@@ -558,6 +558,8 @@ model Setting {
   alertRecipients         String[]  @default([])
   /// alerta quando a soma das diferenças passa deste valor; null = usa a tolerância
   alertThresholdCents     Int?
+  /// quem recebe o resumo semanal (segunda de manhã); vazio = desligado
+  weeklyRecipients        String[]  @default([])
   updatedAt               DateTime  @updatedAt
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id])

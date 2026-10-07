@@ -16,5 +16,6 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!login|_next/static|_next/image|favicon.ico|icon.svg).*)"],
+  // api/cron: chamado pela Vercel sem cookie; a rota confere o CRON_SECRET
+  matcher: ["/((?!login|api/cron|_next/static|_next/image|favicon.ico|icon.svg).*)"],
 };

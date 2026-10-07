@@ -233,6 +233,8 @@ export async function saveSettings(
     alertRecipients?: string;
     /** null = usa a tolerância */
     alertThresholdCents?: number | null;
+    /** undefined = não mexe; "" = resumo semanal desligado */
+    weeklyRecipients?: string;
   },
 ) {
   assertCan(actor, "settings.manage");
@@ -241,6 +243,7 @@ export async function saveSettings(
   }
   const recipients = parseRecipients(input.closingRecipients);
   const alertRecipients = input.alertRecipients === undefined ? undefined : parseRecipients(input.alertRecipients);
+  const weeklyRecipients = input.weeklyRecipients === undefined ? undefined : parseRecipients(input.weeklyRecipients);
   if (input.alertThresholdCents != null && (!Number.isInteger(input.alertThresholdCents) || input.alertThresholdCents < 0 || input.alertThresholdCents > MAX_CENTS)) {
     throw new ServiceError("Valor inválido no limite do alerta.");
   }
@@ -256,6 +259,7 @@ export async function saveSettings(
       emailFrom,
       ...(alertRecipients !== undefined ? { alertRecipients } : {}),
       ...(input.alertThresholdCents !== undefined ? { alertThresholdCents: input.alertThresholdCents } : {}),
+      ...(weeklyRecipients !== undefined ? { weeklyRecipients } : {}),
     };
     const saved = await tx.setting.upsert({ where: { restaurantId: actor.restaurantId }, update: data, create: { ...data, restaurantId: actor.restaurantId } });
     if (input.restaurantName?.trim()) {
