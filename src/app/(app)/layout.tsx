@@ -2,6 +2,7 @@ import Link from "next/link";
 import { can, ROLE_LABEL, type Permission } from "@/lib/permissions";
 import { requireUser } from "@/server/auth/current";
 import { logoutAction } from "@/app/actions/auth";
+import { getAccessState } from "@/server/services/billing";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +19,14 @@ const NAV: { href: string; label: string; perm?: Permission }[] = [
   { href: "/auditoria", label: "Auditoria", perm: "audit.view" },
   { href: "/usuarios", label: "Usuários", perm: "users.manage" },
   { href: "/configuracoes", label: "Configurações", perm: "settings.manage" },
+  { href: "/assinatura", label: "Assinatura", perm: "settings.manage" },
 ];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser({ allowPasswordChange: true });
   const items = user.mustChangePassword ? [] : NAV.filter((n) => !n.perm || can(user.role, n.perm));
+  const access = await getAccessState(user.restaurantId).catch(() => null);
+  const isAdmin = can(user.role, "settings.manage");
   return (
     <div className="min-h-screen">
       <header className="no-print border-b border-stone-200 bg-white">
@@ -54,6 +58,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </nav>
         ) : null}
       </header>
+      {access && access.level !== "full" ? (
+        <div role="status" className={`no-print border-b px-4 py-2 text-center text-sm ${access.level === "readonly" ? "border-red-300 bg-red-50 text-red-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}>
+          {access.message}{" "}
+          {isAdmin ? <Link href="/assinatura" className="font-semibold underline">Ver assinatura</Link> : access.level === "readonly" ? "Fale com o administrador do restaurante." : null}
+        </div>
+      ) : null}
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
     </div>
   );

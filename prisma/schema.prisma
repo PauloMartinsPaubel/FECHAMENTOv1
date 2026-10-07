@@ -74,6 +74,14 @@ model Restaurant {
   timezone  String   @default("America/Sao_Paulo")
   createdAt DateTime @default(now())
 
+  /// EXEMPT = não paga (restaurante da casa); TRIAL = teste grátis; SUBSCRIBED = assinatura criada no Asaas; CANCELED
+  billingPlan         BillingPlan @default(TRIAL)
+  trialEndsAt         DateTime?
+  billingDocument     String?
+  billingEmail        String?
+  asaasCustomerId     String?
+  asaasSubscriptionId String?     @unique
+
   users          User[]
   registers      CashRegister[]
   shifts         Shift[]
@@ -88,8 +96,36 @@ model Restaurant {
   auditLogs      AuditLog[]
   emailLogs      EmailLog[]
   settings       Setting?
+  billingPayments BillingPayment[]
 
   @@map("restaurants")
+}
+
+enum BillingPlan {
+  EXEMPT
+  TRIAL
+  SUBSCRIBED
+  CANCELED
+}
+
+/// Cobranças da assinatura, como o Asaas informa (webhook ou consulta). Nunca apagadas.
+model BillingPayment {
+  id             String    @id @default(uuid())
+  restaurantId   String
+  asaasPaymentId String    @unique
+  /// status do Asaas: PENDING, RECEIVED, CONFIRMED, OVERDUE, REFUNDED, RECEIVED_IN_CASH...
+  status         String
+  valueCents     Int
+  dueDate        DateTime  @db.Date
+  paidAt         DateTime?
+  invoiceUrl     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId, dueDate])
+  @@map("billing_payments")
 }
 
 model Role {

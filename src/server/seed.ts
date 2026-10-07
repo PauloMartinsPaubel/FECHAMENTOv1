@@ -54,7 +54,8 @@ export async function seedBase(prisma: PrismaClient, options: SeedOptions) {
 
   let restaurant = await prisma.restaurant.findFirst({ orderBy: { createdAt: "asc" } });
   if (!restaurant) {
-    restaurant = await prisma.restaurant.create({ data: { name: options.restaurantName ?? "Restaurante" } });
+    // restaurante da instalação inicial (o dono do sistema): não paga assinatura
+    restaurant = await prisma.restaurant.create({ data: { name: options.restaurantName ?? "Restaurante", billingPlan: "EXEMPT" } });
   }
   const restaurantId = restaurant.id;
 

@@ -56,3 +56,9 @@ Toda segunda às 08:00 (horário de Brasília) a Vercel chama `/api/cron/resumo-
 ## Cadastro de restaurante novo
 
 Em `/cadastro` (link na tela de login), um restaurante novo cria a própria conta com o código de convite definido na variável `SIGNUP_CODE` da Vercel. Sem a variável, o cadastro fica fechado. O restaurante nasce com turnos, um caixa, canais, formas de pagamento, bandeiras de ticket e fundo de R$ 100,00, e quem cadastrou vira o administrador. Para trocar o código, edite `SIGNUP_CODE` e faça um novo deploy.
+
+## Cobrança (Asaas)
+
+Restaurante novo começa com 14 dias de teste grátis. O administrador assina em **Assinatura** (CPF ou CNPJ e e-mail das faturas); o Asaas cria a assinatura mensal e cada fatura deixa pagar por PIX, boleto ou cartão. Mensalidade vencida: aviso por 7 dias e, depois, o restaurante fica só leitura (não abre caixa novo; relatórios, histórico e caixa já aberto continuam). Pagou, libera na hora. O restaurante da instalação é isento.
+
+Variáveis na Vercel: `ASAAS_API_KEY` (chave da API), `ASAAS_ENV=production` (sem ela usa o sandbox de testes), `BILLING_PRICE_CENTS` (mensalidade em centavos, ex.: `14990`) e `ASAAS_WEBHOOK_TOKEN`. No painel do Asaas, configure o webhook para `https://SEU-DOMINIO/api/asaas/webhook`, com o mesmo token e os eventos de cobrança.

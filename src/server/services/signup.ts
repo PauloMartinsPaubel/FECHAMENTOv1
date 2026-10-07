@@ -7,6 +7,8 @@ import { BCRYPT_COST, seedRestaurantCatalog } from "../seed";
 import { cleanName } from "./admin";
 import { validatePasswordStrength } from "./auth";
 import { parseRecipients } from "./email";
+import { trialEndFrom } from "./billing";
+import { todayIso } from "@/lib/dates";
 
 export interface SignupInput {
   inviteCode: string;
@@ -49,7 +51,7 @@ export async function registerRestaurant(input: SignupInput, meta: { ip?: string
 
   return prisma.$transaction(
     async (tx) => {
-      const restaurant = await tx.restaurant.create({ data: { name: restaurantName } });
+      const restaurant = await tx.restaurant.create({ data: { name: restaurantName, billingPlan: "TRIAL", trialEndsAt: trialEndFrom(todayIso()) } });
       await seedRestaurantCatalog(tx, restaurant.id);
       const adminRole = await tx.role.findUniqueOrThrow({ where: { code: "ADMIN" } });
       const user = await tx.user.create({

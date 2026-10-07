@@ -1,3 +1,4 @@
+import { assertCanOpenCash } from "./billing";
 import { Prisma } from "@/generated/prisma/client";
 import { addDays, fromDbDate, isIsoDate, todayIso, toDbDate } from "@/lib/dates";
 import { formatBRL, MAX_CENTS } from "@/lib/finance";
@@ -78,6 +79,7 @@ export interface OpenSessionInput {
 
 export async function openSession(actor: Actor, input: OpenSessionInput) {
   assertCan(actor, "session.open");
+  await assertCanOpenCash(actor.restaurantId);
 
   if (!isIsoDate(input.businessDate)) throw new ServiceError("Data inválida.");
   const today = todayIso();
