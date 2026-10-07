@@ -3,7 +3,9 @@ import { formatBRL } from "@/lib/finance";
 import { FLOAT_MODE_LABEL, SESSION_STATUS_LABEL } from "@/lib/reports/labels";
 import { Badge } from "@/components/ui";
 import { getSessionPage } from "@/server/session-page";
+import { closingSteps } from "@/lib/closing-steps";
 import { SessionTabs } from "./tabs";
+import { ClosingStepsBar } from "./steps";
 
 export default async function SessionLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -24,6 +26,7 @@ export default async function SessionLayout({ children, params }: { children: Re
           </p>
         </div>
       </div>
+      <ClosingStepsBar id={id} steps={closingSteps(bundle.evaluation, s.status)} />
       <SessionTabs id={id} />
       {children}
     </div>
