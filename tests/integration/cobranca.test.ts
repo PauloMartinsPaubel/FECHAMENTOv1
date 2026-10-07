@@ -54,7 +54,7 @@ beforeAll(async () => {
   process.env.SIGNUP_CODE = "c";
   process.env.BILLING_PRICE_CENTS = "9990";
   process.env.ASAAS_WEBHOOK_TOKEN = "token-webhook";
-  const r = await registerRestaurant({ inviteCode: "c", restaurantName: "Bistrô Teste", adminName: "Ana", email: "ana@bistro.com", password: "Senha1234", passwordConfirm: "Senha1234" }, { bcryptCost: 4 });
+  const r = await registerRestaurant({ inviteCode: "c", restaurantName: "Bistrô Teste", adminName: "Ana", email: "ana@bistro.com", password: "Senha1234", passwordConfirm: "Senha1234", acceptTerms: true }, { bcryptCost: 4 });
   restaurantId = r.restaurantId;
   actor = { userId: r.userId, name: "Ana", email: "ana@bistro.com", role: "ADMIN", restaurantId };
 });

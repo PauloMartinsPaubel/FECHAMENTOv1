@@ -26,6 +26,9 @@ export default async function LoginPage() {
             Restaurante novo? <Link href="/cadastro" className="link">Cadastre aqui</Link>
           </p>
         ) : null}
+        <p className="mt-6 text-center text-xs text-stone-500">
+          <Link href="/termos" className="hover:underline">Termos de Uso</Link> · <Link href="/privacidade" className="hover:underline">Privacidade</Link>
+        </p>
       </div>
     </main>
   );

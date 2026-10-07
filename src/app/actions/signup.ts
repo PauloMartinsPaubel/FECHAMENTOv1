@@ -6,7 +6,7 @@ import { clientIp, setSessionCookie } from "@/server/auth/current";
 import { loginWithPassword } from "@/server/services/auth";
 import { registerRestaurant } from "@/server/services/signup";
 import type { ActionState } from "./types";
-import { run, str } from "./util";
+import { bool, run, str } from "./util";
 
 export async function signupAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const result = await run(async () => {
@@ -20,6 +20,7 @@ export async function signupAction(_prev: ActionState, fd: FormData): Promise<Ac
         email: str(fd, "email"),
         password,
         passwordConfirm: String(fd.get("passwordConfirm") ?? ""),
+        acceptTerms: bool(fd, "acceptTerms"),
       },
       { ip },
     );

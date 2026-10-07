@@ -65,6 +65,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       ) : null}
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <footer className="no-print mx-auto max-w-6xl px-4 pb-8 text-xs text-stone-400">
+        <Link href="/termos" className="hover:underline">Termos de Uso</Link> · <Link href="/privacidade" className="hover:underline">Privacidade</Link>
+      </footer>
     </div>
   );
 }

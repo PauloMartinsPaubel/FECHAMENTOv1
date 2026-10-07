@@ -9,6 +9,7 @@ import { validatePasswordStrength } from "./auth";
 import { parseRecipients } from "./email";
 import { trialEndFrom } from "./billing";
 import { todayIso } from "@/lib/dates";
+import { TERMS_VERSION } from "@/lib/legal/company";
 
 export interface SignupInput {
   inviteCode: string;
@@ -17,6 +18,8 @@ export interface SignupInput {
   email: string;
   password: string;
   passwordConfirm: string;
+  /** marcou "li e aceito os Termos de Uso e a Política de Privacidade" */
+  acceptTerms: boolean;
 }
 
 /** O cadastro só abre com o código de convite (SIGNUP_CODE). Sem a variável, fica fechado. */
@@ -37,6 +40,7 @@ function codeMatches(given: string): boolean {
 export async function registerRestaurant(input: SignupInput, meta: { ip?: string | null; bcryptCost?: number } = {}) {
   if (!signupOpen()) throw new ServiceError("O cadastro de novos restaurantes está fechado no momento.", "STATE");
   if (!codeMatches(input.inviteCode)) throw new ServiceError("Código de convite inválido.");
+  if (!input.acceptTerms) throw new ServiceError("Para criar a conta, é preciso aceitar os Termos de Uso e a Política de Privacidade.");
   const restaurantName = cleanName(input.restaurantName, "O nome do restaurante");
   const adminName = cleanName(input.adminName, "O seu nome");
   const [email] = parseRecipients(input.email);
@@ -61,7 +65,8 @@ export async function registerRestaurant(input: SignupInput, meta: { ip?: string
         action: "restaurant.signup",
         entity: "restaurant",
         entityId: restaurant.id,
-        newValue: { restaurant: restaurantName, admin: email },
+        // o aceite fica registrado com a versão do texto, a data e o IP
+        newValue: { restaurant: restaurantName, admin: email, termsVersion: TERMS_VERSION, termsAcceptedAt: new Date().toISOString() },
       });
       return { restaurantId: restaurant.id, userId: user.id, email };
     },

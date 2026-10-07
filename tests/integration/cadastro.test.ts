@@ -7,7 +7,7 @@ import { openSession } from "@/server/services/sessions";
 import { listClosings } from "@/server/services/queries";
 
 let env: Env;
-const base = { inviteCode: "convite-123", restaurantName: "Cantina Nova", adminName: "Maria Dona", email: "maria@cantina.com", password: "Senha1234", passwordConfirm: "Senha1234" };
+const base = { inviteCode: "convite-123", restaurantName: "Cantina Nova", adminName: "Maria Dona", email: "maria@cantina.com", password: "Senha1234", passwordConfirm: "Senha1234", acceptTerms: true };
 
 beforeAll(async () => {
   env = await bootstrap();
@@ -25,6 +25,10 @@ describe("cadastro de restaurante novo", () => {
     await expect(registerRestaurant(base, { bcryptCost: 4 })).rejects.toThrow(/fechado/);
     process.env.SIGNUP_CODE = "convite-123";
     await expect(registerRestaurant({ ...base, inviteCode: "outro" }, { bcryptCost: 4 })).rejects.toThrow(/Código de convite inválido/);
+  });
+
+  it("sem aceitar os termos não cria a conta; com aceite, registra a versão", async () => {
+    await expect(registerRestaurant({ ...base, acceptTerms: false }, { bcryptCost: 4 })).rejects.toThrow(/Termos de Uso/);
   });
 
   it("valida nome, e-mail, senha e confirmação", async () => {
@@ -55,7 +59,8 @@ describe("cadastro de restaurante novo", () => {
     expect(login.token).toBeTruthy();
     const user = await prisma.user.findUniqueOrThrow({ where: { email: "maria@cantina.com" }, include: { role: true } });
     expect(user).toMatchObject({ restaurantId: r.restaurantId, mustChangePassword: false, role: { code: "ADMIN" } });
-    expect(await prisma.auditLog.count({ where: { action: "restaurant.signup", restaurantId: r.restaurantId } })).toBe(1);
+    const log = await prisma.auditLog.findFirstOrThrow({ where: { action: "restaurant.signup", restaurantId: r.restaurantId } });
+    expect(log.newValue).toMatchObject({ termsVersion: "2026-10-08" });
   });
 
   it("um restaurante não enxerga nem mexe no outro", async () => {
