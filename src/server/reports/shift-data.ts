@@ -1,4 +1,4 @@
-import { KIND_LABEL, PAYMENT_KINDS } from "@/lib/finance";
+import { cashCountTotal, describeCashCount, KIND_LABEL, PAYMENT_KINDS, parseStoredCashCount } from "@/lib/finance";
 import { fromDbDate } from "@/lib/dates";
 import type { ShiftReportData } from "@/lib/reports/types";
 import type { SessionBundle } from "../loaders";
@@ -43,6 +43,8 @@ export function buildShiftReportData(bundle: SessionBundle, overrides: ShiftRepo
 
   const closing = session.closing;
   const transferred = session.transferredFrom;
+  const stored = parseStoredCashCount(bundle.conferences.find((c) => c.lineKey === "cash")?.breakdown);
+  const cashCount: ShiftReportData["cashCount"] = stored ? { lines: describeCashCount(stored), totalCents: cashCountTotal(stored) } : null;
 
   return {
     version: 1,
@@ -67,6 +69,7 @@ export function buildShiftReportData(bundle: SessionBundle, overrides: ShiftRepo
       reopenCount: session.reopenCount,
     },
     floatCents: s.floatCents,
+    cashCount,
     salesByKind: PAYMENT_KINDS.map((kind) => ({
       kind,
       label: KIND_LABEL[kind],

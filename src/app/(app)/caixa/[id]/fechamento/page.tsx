@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { formatDateTimeBR } from "@/lib/dates";
-import { formatBRL, formatDecimalComma } from "@/lib/finance";
+import { formatBRL, formatDecimalComma, parseStoredCashCount } from "@/lib/finance";
 import { can } from "@/lib/permissions";
 import { statusText } from "@/lib/reports/labels";
 import type { ShiftReportData } from "@/lib/reports/types";
@@ -92,6 +92,7 @@ export default async function ClosingPage({ params, searchParams }: { params: Pr
               showClose
               initialJustification={closing?.justification ?? ""}
               initialNotes={closing?.notes ?? ""}
+              initialCashCount={parseStoredCashCount(bundle.conferences.find((c) => c.lineKey === "cash")?.breakdown)}
             />
           ) : (
             <Alert tone="info">Este caixa está em correção por um gerente. Só gerente ou administrador consegue concluir.</Alert>

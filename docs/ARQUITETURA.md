@@ -163,6 +163,8 @@ Login -> escolher caixa e turno -> abrir caixa (fundo padrão R$ 100,00, modo do
   -> relatório, CSV, e-mail (separado do fechamento, com reenvio)
 ```
 
+Contagem do dinheiro por cédula e moeda (opcional): na conferência, a pessoa informa quantas peças de cada valor há na gaveta (R$ 200 a 1 centavo) e o sistema soma. Com a contagem ligada, o dinheiro conferido é a soma dela; o servidor recusa se os dois não baterem. A contagem fica em `closing_conferences.breakdown` (linha `cash`), entra na foto do fechamento e aparece no relatório, no e-mail e na impressão. Mudança de contagem em correção exige motivo e vira registro em `adjustments`.
+
 Estados da sessão: `OPEN` -> `CLOSED` -> `REOPENED` (gerente, motivo obrigatório) -> `CORRECTED` (fechada de novo após correção). `CORRECTED` pode ser reaberta outra vez. Sessão fechada não aceita nenhuma alteração.
 
 ## 6. Telas

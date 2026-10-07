@@ -19,6 +19,7 @@ export const REPORT_CSS = `
 .rpt *{box-sizing:border-box}
 .rpt h1{font-size:20px;letter-spacing:.04em;text-align:center;margin:0 0 4px;text-transform:uppercase}
 .rpt h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin:22px 0 6px;padding-bottom:4px;border-bottom:2px solid #1c1917;color:#1c1917}
+.rpt h3{font-size:12px;font-weight:700;margin:14px 0 4px;color:#44403c}
 .rpt .sub{text-align:center;color:#57534e;margin:0 0 14px}
 .rpt .meta{display:grid;grid-template-columns:repeat(2,1fr);gap:2px 24px;margin:10px 0 4px}
 .rpt .meta div span{color:#57534e}
@@ -52,6 +53,18 @@ function row(label: string, cents: number, cls = ""): string {
 }
 
 /** Relatório do turno no layout do pedido: abertura, vendas, movimentações, conferência e resultado. */
+function cashCountBlock(count: ShiftReportData["cashCount"]): string {
+  if (!count) return "";
+  const lines = count.lines
+    .map((l) => `<tr class="row"><td>${esc(`${l.quantity} x ${l.label}`)}</td>${money(l.totalCents)}</tr>`)
+    .join("");
+  return `<h3>Contagem do dinheiro por cédula e moeda</h3>
+<table>
+${lines || `<tr class="row"><td class="small">Gaveta sem dinheiro</td>${money(0)}</tr>`}
+<tr class="total"><td>Total contado</td>${money(count.totalCents)}</tr>
+</table>`;
+}
+
 export function renderShiftReport(d: ShiftReportData, corrections: CorrectionLine[] = []): string {
   const s = d.session;
   const t = d.totals;
@@ -143,6 +156,7 @@ ${d.cash.adjustmentsCents ? row("(+/-) Ajustes", d.cash.adjustmentsCents) : ""}
 <tr class="row"><td>Dinheiro contado</td>${cashLine?.checkedCents == null ? `<td class="n small">não conferido</td>` : money(cashLine.checkedCents)}</tr>
 <tr class="total"><td>Diferença de dinheiro</td>${diffCell(cashLine?.differenceCents ?? null)}</tr>
 </table>
+${cashCountBlock(d.cashCount)}
 
 ${conferenceBlock("Conferência de cartões", [...byGroup("CREDIT"), ...byGroup("DEBIT")])}
 ${conferenceBlock("Conferência de PIX", byGroup("PIX"))}

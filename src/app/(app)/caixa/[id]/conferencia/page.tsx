@@ -8,6 +8,7 @@ import { IfoodPanel } from "../ifood-panel";
 import { ifoodShiftComparison } from "@/server/services/integrations";
 import { ifoodConfigFromEnv } from "@/server/integrations/ifood/client";
 import { can } from "@/lib/permissions";
+import { parseStoredCashCount } from "@/lib/finance";
 
 export const metadata: Metadata = { title: "Conferência de valores" };
 
@@ -45,6 +46,7 @@ export default async function ConferencePage({ params }: { params: Promise<{ id:
         showClose={false}
         initialJustification={session.closing?.justification ?? ""}
         initialNotes={session.closing?.notes ?? ""}
+        initialCashCount={parseStoredCashCount(bundle.conferences.find((c) => c.lineKey === "cash")?.breakdown)}
       />
       {ev.divergence.hints.length > 0 ? (
         <section className="card">

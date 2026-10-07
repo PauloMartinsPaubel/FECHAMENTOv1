@@ -5,7 +5,7 @@ import { ActionForm } from "@/components/action-form";
 import { MoneyInput } from "@/components/money-input";
 import { ConfirmSubmit } from "@/components/small-client";
 import { conferenceAction } from "@/app/actions/cash";
-import { formatBRL, formatDecimalComma, formatSigned, KIND_LABEL, parseMoney, type PaymentKind } from "@/lib/finance";
+import { CASH_DENOMINATIONS, type CashCount, formatBRL, formatDecimalComma, formatSigned, KIND_LABEL, parseMoney, type PaymentKind } from "@/lib/finance";
 import { statusText } from "@/lib/reports/labels";
 
 export type LineView = {
@@ -61,6 +61,7 @@ export function ConferenceForm({
   initialJustification,
   initialNotes,
   cashHint,
+  initialCashCount = null,
 }: {
   sessionId: string;
   lines: LineView[];
@@ -71,8 +72,38 @@ export function ConferenceForm({
   initialJustification: string;
   initialNotes: string;
   cashHint?: string;
+  /** contagem por cédula e moeda já gravada (null = só o total foi digitado) */
+  initialCashCount?: CashCount | null;
 }) {
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(lines.map((l) => [l.key, initial(l)])));
+  const [countOn, setCountOn] = useState(initialCashCount !== null);
+  const [countFocus, setCountFocus] = useState(false);
+  const [counts, setCounts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(Object.entries(initialCashCount ?? {}).map(([k, q]) => [k, String(q)])),
+  );
+  const countTotal = Object.entries(counts).reduce((a, [k, q]) => a + Number(k) * (Number(q) || 0), 0);
+
+  // com a contagem ligada, o dinheiro conferido é sempre a soma dela
+  const applyCount = (next: Record<string, string>) => {
+    const filled = Object.values(next).some((q) => q !== "");
+    const total = Object.entries(next).reduce((a, [k, q]) => a + Number(k) * (Number(q) || 0), 0);
+    setValues((v) => ({ ...v, cash: filled ? formatDecimalComma(total) : "" }));
+  };
+  const setCount = (key: string, raw: string) => {
+    const q = raw.replace(/\D/g, "").slice(0, 6);
+    const next = { ...counts, [key]: q };
+    setCounts(next);
+    applyCount(next);
+  };
+  const toggleCount = () => {
+    if (countOn) {
+      setCountOn(false);
+      return;
+    }
+    setCountOn(true);
+    setCountFocus(true);
+    applyCount(counts);
+  };
   const [justification, setJustification] = useState(initialJustification);
   const [reason, setReason] = useState("");
 
@@ -168,8 +199,9 @@ export function ConferenceForm({
                         id={`line:${l.key}`}
                         value={values[l.key] ?? ""}
                         onValueChange={(v) => set(l.key, v)}
-                        className={`input-money ${r.invalid ? "border-red-500" : ""}`}
+                        className={`input-money ${r.invalid ? "border-red-500" : ""} ${l.key === "cash" && countOn ? "bg-stone-100" : ""}`}
                         ariaLabel={`Conferido: ${l.fullLabel}`}
+                        readOnly={l.key === "cash" && countOn}
                       />
                       {l.group !== "CASH" ? (
                         <button
@@ -195,6 +227,64 @@ export function ConferenceForm({
                 <span className="tabular-nums sm:text-right">{formatBRL(t.system)}</span>
                 <span className="tabular-nums sm:text-right">{t.complete ? formatBRL(t.checked) : "..."}</span>
                 <span className="sm:text-right">{diffText(t.diff)}</span>
+              </div>
+            ) : null}
+            {sec.id === "cash" && secLines.some((l) => l.key === "cash") ? (
+              <div className="mt-3 rounded-lg border border-stone-200 p-3">
+                <input type="hidden" name="count:mode" value={countOn ? "on" : "off"} />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold">Contagem por cédula e moeda</div>
+                    <p className="text-xs text-stone-500">
+                      {countOn ? "Digite quantas peças de cada valor há na gaveta. O sistema soma e preenche o dinheiro conferido." : "Opcional: conte peça por peça e deixe o sistema fazer a soma."}
+                    </p>
+                  </div>
+                  <button type="button" className="btn-secondary btn-sm" onClick={toggleCount} aria-expanded={countOn}>
+                    {countOn ? "Digitar só o total" : "Contar cédulas e moedas"}
+                  </button>
+                </div>
+                {countOn ? (
+                  <div className="mt-3 space-y-3">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {(["nota", "moeda"] as const).map((kind) => (
+                        <fieldset key={kind}>
+                          <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{kind === "nota" ? "Cédulas" : "Moedas"}</legend>
+                          <ul className="space-y-1">
+                            {CASH_DENOMINATIONS.filter((d) => d.kind === kind).map((d, i) => {
+                              const key = String(d.cents);
+                              const q = counts[key] ?? "";
+                              return (
+                                <li key={key} className="grid grid-cols-[6.5rem_5rem_1fr] items-center gap-2">
+                                  <label htmlFor={`count:${key}`} className="text-sm">{d.label}</label>
+                                  <input
+                                    id={`count:${key}`}
+                                    name={`count:${key}`}
+                                    inputMode="numeric"
+                                    autoComplete="off"
+                                    pattern="[0-9]*"
+                                    maxLength={6}
+                                    placeholder="0"
+                                    className="input py-1 text-right tabular-nums"
+                                    value={q}
+                                    autoFocus={countFocus && kind === "nota" && i === 0}
+                                    onFocus={(e) => e.currentTarget.select()}
+                                    onChange={(e) => setCount(key, e.target.value)}
+                                    aria-label={`Quantidade de ${d.kind === "nota" ? "notas" : "moedas"} de ${d.label}`}
+                                  />
+                                  <span className="text-right text-sm tabular-nums text-stone-600">{q ? formatBRL(d.cents * (Number(q) || 0)) : ""}</span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </fieldset>
+                      ))}
+                    </div>
+                    <div className="flex justify-between border-t-2 border-stone-300 pt-2 font-bold">
+                      <span>Total contado</span>
+                      <span className="tabular-nums">{formatBRL(countTotal)}</span>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {sec.id === "cash" && cashHint ? <p className="mt-2 text-xs text-stone-500">{cashHint}</p> : null}
@@ -243,7 +333,8 @@ export function ConferenceForm({
         ) : null}
         {blockedReason && showClose ? <p className="text-sm text-stone-600">{blockedReason}</p> : null}
         <div className="flex flex-wrap gap-3">
-          <button type="submit" name="intent" value="check" className="btn-secondary">Conferir</button>
+          {/* salvar não exige justificativa nem campos completos: isso só vale para fechar (o servidor confere) */}
+          <button type="submit" name="intent" value="check" className="btn-secondary" formNoValidate>Conferir</button>
           {showClose ? (
             <ConfirmSubmit
               name="intent"

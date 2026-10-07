@@ -1,5 +1,6 @@
 import type {
   CashBreakdown,
+  CashCountLine,
   ClosingStatus,
   DivergenceSummary,
   PaymentKind,
@@ -52,6 +53,8 @@ export interface ShiftReportData {
     cancellationsCount: number;
   };
   cash: CashBreakdown;
+  /** contagem do dinheiro por cédula e moeda; ausente em fechamentos antigos, null quando só o total foi digitado */
+  cashCount?: { lines: CashCountLine[]; totalCents: number } | null;
   conference: {
     key: string;
     group: PaymentKind;

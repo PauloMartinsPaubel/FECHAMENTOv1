@@ -214,6 +214,19 @@ function conferenceValues(fd: FormData): Record<string, number | null> {
   return values;
 }
 
+/** Contagem por cédula e moeda: "count:mode" = on | off; quantidades em "count:<centavos>". Ausente = não mexe. */
+function cashCountValues(fd: FormData): Record<string, string> | null | undefined {
+  const mode = str(fd, "count:mode");
+  if (mode === "off") return null;
+  if (mode !== "on") return undefined;
+  const out: Record<string, string> = {};
+  for (const [name, raw] of fd.entries()) {
+    if (!name.startsWith("count:") || name === "count:mode" || typeof raw !== "string") continue;
+    out[name.slice(6)] = raw;
+  }
+  return out;
+}
+
 /** Botão "Conferir" grava e recalcula; botão "Fechar caixa" grava e fecha. Uma ação, duas intenções. */
 export async function conferenceAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   let closed = false;
@@ -222,7 +235,7 @@ export async function conferenceAction(_p: ActionState, fd: FormData): Promise<A
     const actor = await actorFromSession();
     const intent = str(fd, "intent");
     const reason = optStr(fd, "reason");
-    await saveConference(actor, sessionId, conferenceValues(fd), reason);
+    await saveConference(actor, sessionId, conferenceValues(fd), reason, cashCountValues(fd));
     if (intent === "close") {
       await closeSession(actor, sessionId, {
         justification: optStr(fd, "justification"),

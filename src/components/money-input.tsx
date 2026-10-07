@@ -14,6 +14,7 @@ export function MoneyInput({
   autoFocus,
   ariaLabel,
   value: controlled,
+  readOnly,
 }: {
   name: string;
   defaultValue?: string;
@@ -26,6 +27,8 @@ export function MoneyInput({
   ariaLabel?: string;
   /** se informado, o campo é controlado por quem chama */
   value?: string;
+  /** valor vem de outro lugar (ex.: soma da contagem de cédulas); continua sendo enviado no formulário */
+  readOnly?: boolean;
 }) {
   const [inner, setInner] = useState(defaultValue ?? "");
   const value = controlled ?? inner;
@@ -41,6 +44,7 @@ export function MoneyInput({
       value={value}
       autoFocus={autoFocus}
       aria-label={ariaLabel}
+      readOnly={readOnly}
       pattern="[0-9.,\s]*"
       title="Digite o valor em reais, por exemplo 1.234,56"
       onChange={(e) => {

@@ -371,6 +371,8 @@ model ClosingConference {
   checkedCents    Int?
   differenceCents Int?
   note            String?
+  /// só na linha "cash": contagem por cédula e moeda ({"10000": 2, ...}); null = só o total foi digitado
+  breakdown       Json?
   updatedById     String?
   updatedAt       DateTime     @updatedAt
   createdAt       DateTime     @default(now())
