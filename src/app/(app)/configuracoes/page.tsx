@@ -33,6 +33,8 @@ export default async function SettingsPage() {
             defaultFloatMode: settings.defaultFloatMode,
             recipients: settings.closingRecipients.join(", "),
             emailFrom: settings.emailFrom ?? "",
+            alertRecipients: settings.alertRecipients.join(", "),
+            alertThreshold: settings.alertThresholdCents === null ? "" : formatDecimalComma(settings.alertThresholdCents),
           }}
         />
         <div className="mt-4">

@@ -61,6 +61,8 @@ export async function saveSettingsAction(_p: ActionState, fd: FormData): Promise
       closingRecipients: str(fd, "recipients"),
       emailFrom: optStr(fd, "emailFrom"),
       restaurantName: str(fd, "restaurantName"),
+      alertRecipients: str(fd, "alertRecipients"),
+      alertThresholdCents: moneyField(fd, "alertThreshold", "o limite do alerta"),
     });
     revalidatePath("/configuracoes");
     return "Configurações salvas.";

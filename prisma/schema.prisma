@@ -554,6 +554,10 @@ model Setting {
   defaultFloatMode        FloatMode @default(NEW_OPENING)
   closingRecipients       String[]
   emailFrom               String?
+  /// quem recebe o alerta de divergência (vazio = alerta desligado)
+  alertRecipients         String[]  @default([])
+  /// alerta quando a soma das diferenças passa deste valor; null = usa a tolerância
+  alertThresholdCents     Int?
   updatedAt               DateTime  @updatedAt
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id])

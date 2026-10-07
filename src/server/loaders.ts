@@ -35,6 +35,8 @@ export async function getSettings(db: Db, restaurantId: string) {
       defaultFloatMode: "NEW_OPENING" as const,
       closingRecipients: [] as string[],
       emailFrom: null,
+      alertRecipients: [] as string[],
+      alertThresholdCents: null as number | null,
       updatedAt: new Date(),
     }
   );

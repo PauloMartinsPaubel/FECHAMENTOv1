@@ -229,6 +229,10 @@ export async function saveSettings(
     closingRecipients: string;
     emailFrom?: string | null;
     restaurantName?: string;
+    /** undefined = não mexe (telas antigas); "" = alerta desligado */
+    alertRecipients?: string;
+    /** null = usa a tolerância */
+    alertThresholdCents?: number | null;
   },
 ) {
   assertCan(actor, "settings.manage");
@@ -236,6 +240,10 @@ export async function saveSettings(
     if (!Number.isInteger(v) || v < 0 || v > MAX_CENTS) throw new ServiceError(`Valor inválido em ${label}.`);
   }
   const recipients = parseRecipients(input.closingRecipients);
+  const alertRecipients = input.alertRecipients === undefined ? undefined : parseRecipients(input.alertRecipients);
+  if (input.alertThresholdCents != null && (!Number.isInteger(input.alertThresholdCents) || input.alertThresholdCents < 0 || input.alertThresholdCents > MAX_CENTS)) {
+    throw new ServiceError("Valor inválido no limite do alerta.");
+  }
   const emailFrom = input.emailFrom?.trim() || null;
   if (emailFrom && emailFrom.length > 200) throw new ServiceError("Remetente longo demais.");
   return prisma.$transaction(async (tx) => {
@@ -246,6 +254,8 @@ export async function saveSettings(
       defaultFloatMode: input.defaultFloatMode,
       closingRecipients: recipients,
       emailFrom,
+      ...(alertRecipients !== undefined ? { alertRecipients } : {}),
+      ...(input.alertThresholdCents !== undefined ? { alertThresholdCents: input.alertThresholdCents } : {}),
     };
     const saved = await tx.setting.upsert({ where: { restaurantId: actor.restaurantId }, update: data, create: { ...data, restaurantId: actor.restaurantId } });
     if (input.restaurantName?.trim()) {

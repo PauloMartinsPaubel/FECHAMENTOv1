@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { formatBRL } from "@/lib/finance";
 import { ServiceError } from "@/server/errors";
 import { closeSession, reopenSession } from "@/server/services/closing";
 import { saveConference } from "@/server/services/conference";
 import { sendClosingEmail } from "@/server/services/email";
+import { sendDivergenceAlert } from "@/server/services/alerts";
 import {
   cancelSale,
   createMovement,
@@ -243,6 +245,8 @@ export async function conferenceAction(_p: ActionState, fd: FormData): Promise<A
         correctionReason: reason,
       });
       closed = true;
+      // alerta de divergência depois da resposta: o fechamento não espera nem depende do e-mail
+      after(() => sendDivergenceAlert(actor, sessionId));
       return;
     }
     return "Conferência salva e recalculada.";

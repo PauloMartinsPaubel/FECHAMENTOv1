@@ -8,7 +8,10 @@ import { saveCatalogAction, saveSettingsAction } from "@/app/actions/admin";
 export function SettingsForm({
   values,
 }: {
-  values: { restaurantName: string; defaultOpeningFloat: string; tolerance: string; defaultFloatMode: string; recipients: string; emailFrom: string };
+  values: {
+    restaurantName: string; defaultOpeningFloat: string; tolerance: string; defaultFloatMode: string; recipients: string; emailFrom: string;
+    alertRecipients: string; alertThreshold: string;
+  };
 }) {
   return (
     <ActionForm action={saveSettingsAction} className="grid gap-4 sm:grid-cols-2">
@@ -28,6 +31,15 @@ export function SettingsForm({
       <Field label="Destinatários do relatório de fechamento" htmlFor="recipients" hint="Separe por vírgula. Até 10 e-mails." className="sm:col-span-2">
         <input id="recipients" name="recipients" defaultValue={values.recipients} className="input" placeholder="gerente@restaurante.com.br, dono@restaurante.com.br" autoComplete="off" />
       </Field>
+      <fieldset className="grid gap-4 rounded-lg border border-red-200 bg-red-50/40 p-4 sm:col-span-2 sm:grid-cols-2">
+        <legend className="px-1 text-sm font-semibold text-red-900">Alerta de divergência</legend>
+        <Field label="Quem recebe o alerta" htmlFor="alertRecipients" hint="Recebe um e-mail na hora em que um caixa fecha com diferença acima do limite. Vazio desliga o alerta." className="sm:col-span-2">
+          <input id="alertRecipients" name="alertRecipients" defaultValue={values.alertRecipients} className="input" placeholder="dono@restaurante.com.br" autoComplete="off" />
+        </Field>
+        <Field label="Alertar quando a diferença passar de (R$)" htmlFor="alertThreshold" hint="Soma das diferenças do caixa. Vazio usa a tolerância acima.">
+          <MoneyInput name="alertThreshold" defaultValue={values.alertThreshold} placeholder="usa a tolerância" />
+        </Field>
+      </fieldset>
       <Field label="Remetente do e-mail (opcional)" htmlFor="emailFrom" hint="Se vazio, usa EMAIL_FROM do servidor." className="sm:col-span-2">
         <input id="emailFrom" name="emailFrom" defaultValue={values.emailFrom} className="input" placeholder="Fechamento de Caixa <caixa@seudominio.com.br>" />
       </Field>
