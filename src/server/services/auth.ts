@@ -110,12 +110,25 @@ export async function userFromToken(token: string | undefined | null, ip?: strin
     await prisma.authSession.update({ where: { id: session.id }, data: { lastSeenAt: new Date() } }).catch(() => undefined);
   }
   const u = session.user;
+  // unidade escolhida no seletor: vale se o acesso a ela continua ativo; senão, volta para a principal
+  let restaurantId = u.restaurantId;
+  let role = u.role.code as RoleCode;
+  if (session.activeRestaurantId && session.activeRestaurantId !== u.restaurantId) {
+    const m = await prisma.membership.findUnique({
+      where: { userId_restaurantId: { userId: u.id, restaurantId: session.activeRestaurantId } },
+      include: { role: true },
+    });
+    if (m?.active) {
+      restaurantId = m.restaurantId;
+      role = m.role.code as RoleCode;
+    }
+  }
   return {
     userId: u.id,
     name: u.name,
     email: u.email,
-    role: u.role.code as RoleCode,
-    restaurantId: u.restaurantId,
+    role,
+    restaurantId,
     ip: ip ?? null,
     mustChangePassword: u.mustChangePassword,
     sessionId: session.id,

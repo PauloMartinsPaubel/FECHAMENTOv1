@@ -3,6 +3,8 @@ import { can, ROLE_LABEL, type Permission } from "@/lib/permissions";
 import { requireUser } from "@/server/auth/current";
 import { logoutAction } from "@/app/actions/auth";
 import { getAccessState } from "@/server/services/billing";
+import { listAccessibleUnits } from "@/server/services/units";
+import { UnitSwitcher } from "@/components/unit-switcher";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const items = user.mustChangePassword ? [] : NAV.filter((n) => !n.perm || can(user.role, n.perm));
   const access = await getAccessState(user.restaurantId).catch(() => null);
   const isAdmin = can(user.role, "settings.manage");
+  const units = await listAccessibleUnits(user.userId).catch(() => []);
   return (
     <div className="min-h-screen">
       <header className="no-print border-b border-stone-200 bg-white">
@@ -36,6 +39,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span>Fechamento de Caixa</span>
           </Link>
           <div className="flex items-center gap-3 text-sm">
+            {units.length > 1 && !user.mustChangePassword ? <UnitSwitcher units={units} current={user.restaurantId} /> : null}
             <span className="text-stone-600">
               {user.name} <span className="text-stone-400">({ROLE_LABEL[user.role]})</span>
             </span>
