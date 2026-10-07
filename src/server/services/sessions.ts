@@ -1,6 +1,6 @@
 import { assertCanOpenCash } from "./billing";
 import { Prisma } from "@/generated/prisma/client";
-import { addDays, fromDbDate, isIsoDate, todayIso, toDbDate } from "@/lib/dates";
+import { addDays, formatDateBR, fromDbDate, isIsoDate, todayIso, toDbDate } from "@/lib/dates";
 import { formatBRL, MAX_CENTS } from "@/lib/finance";
 import { can } from "@/lib/permissions";
 import { Actor, assertCan } from "../actor";
@@ -110,7 +110,16 @@ export async function openSession(actor: Actor, input: OpenSessionInput) {
           },
         },
       });
-      if (existing) return { session: existing, created: false };
+      if (existing) {
+        // caixa já fechado neste turno e data: operador não vê fechamento de outra pessoa, então explica em vez de mandar para lá
+        if ((existing.status === "CLOSED" || existing.status === "CORRECTED") && !canAccessSession(actor, existing)) {
+          throw new ServiceError(
+            `${register.name} no turno ${shift.name} de ${formatDateBR(input.businessDate)} já foi aberto e fechado. Cada caixa abre uma vez por turno e data. Para lançar algo nele, peça a um gerente para reabrir; para um novo atendimento, use outro caixa.`,
+            "CONFLICT",
+          );
+        }
+        return { session: existing, created: false };
+      }
 
       const openElsewhere = await tx.cashSession.findFirst({
         where: { registerId: register.id, status: "OPEN" },
