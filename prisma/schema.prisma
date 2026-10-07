@@ -717,3 +717,20 @@ model Membership {
   @@index([restaurantId])
   @@map("memberships")
 }
+
+/// Erros do servidor agrupados por assinatura (mesma mensagem no mesmo lugar). Base do aviso ao suporte.
+model ErrorEvent {
+  id          String    @id @default(uuid())
+  fingerprint String    @unique
+  message     String
+  stack       String?
+  path        String?
+  kind        String?
+  count       Int       @default(1)
+  firstSeenAt DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  notifiedAt  DateTime?
+
+  @@index([lastSeenAt])
+  @@map("error_events")
+}

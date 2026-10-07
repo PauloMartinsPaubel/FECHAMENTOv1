@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import type { Actor } from "@/server/actor";
 
 export const TABLES = [
-  "memberships", "billing_payments", "platform_events", "platform_orders", "platform_integrations",
+  "error_events", "memberships", "billing_payments", "platform_events", "platform_orders", "platform_integrations",
   "email_logs", "closing_details", "closing_conferences", "adjustments", "cancellations", "cash_movements",
   "cash_closings", "cash_sessions", "auth_sessions", "audit_logs", "users", "settings", "ticket_brands",
   "payment_methods", "sales_channels", "shifts", "cash_registers", "roles", "restaurants",

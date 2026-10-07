@@ -5,6 +5,7 @@ import { logoutAction } from "@/app/actions/auth";
 import { getAccessState } from "@/server/services/billing";
 import { listAccessibleUnits } from "@/server/services/units";
 import { UnitSwitcher } from "@/components/unit-switcher";
+import { SupportLinks } from "@/components/support-links";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
       <footer className="no-print mx-auto max-w-6xl px-4 pb-8 text-xs text-stone-400">
         <Link href="/termos" className="hover:underline">Termos de Uso</Link> · <Link href="/privacidade" className="hover:underline">Privacidade</Link>
+        <SupportLinks className="ml-3" />
       </footer>
     </div>
   );

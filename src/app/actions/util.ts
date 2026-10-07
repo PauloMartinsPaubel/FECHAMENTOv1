@@ -4,6 +4,7 @@ import { clientIp, requireUser } from "@/server/auth/current";
 import { errorMessage, ServiceError } from "@/server/errors";
 import type { Actor } from "@/server/actor";
 import type { ActionState } from "./types";
+import { reportError } from "@/server/services/monitoring";
 
 /** Usuário logado como Actor (com IP) para chamar os serviços. */
 export async function actorFromSession(): Promise<Actor> {
@@ -19,6 +20,11 @@ export async function run(fn: () => Promise<string | void>): Promise<ActionState
   } catch (err) {
     // redirect() do Next lança um erro especial que precisa seguir adiante
     if (err && typeof err === "object" && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
+    // erro inesperado (não é regra de negócio): vai para o monitoramento
+    if (!(err instanceof ServiceError)) {
+      const e = err as Error;
+      await reportError({ message: e?.message || String(err), stack: e?.stack, kind: "ação" });
+    }
     return { ok: false, error: errorMessage(err), code: err instanceof ServiceError ? err.code : undefined };
   }
 }
