@@ -32,7 +32,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </p>
         ) : null}
         <p className="mt-6 text-center text-xs text-stone-500">
-          <Link href="/termos" className="hover:underline">Termos de Uso</Link> · <Link href="/privacidade" className="hover:underline">Privacidade</Link>
+          <Link href="/conheca" className="hover:underline">Conheça o sistema</Link> · <Link href="/termos" className="hover:underline">Termos de Uso</Link> · <Link href="/privacidade" className="hover:underline">Privacidade</Link>
         </p>
       </div>
     </main>

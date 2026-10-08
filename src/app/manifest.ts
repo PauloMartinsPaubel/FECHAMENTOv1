@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Fechamento de Caixa",
     short_name: "Caixa",
-    start_url: "/",
+    start_url: "/login",
     display: "standalone",
     background_color: "#f5f5f4",
     theme_color: "#15803d",

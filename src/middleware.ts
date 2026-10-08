@@ -10,12 +10,13 @@ const COOKIE = "fc_session";
 export function middleware(req: NextRequest) {
   if (req.cookies.get(COOKIE)?.value) return NextResponse.next();
   const url = req.nextUrl.clone();
-  url.pathname = "/login";
+  // quem chega pelo endereço principal sem login vê a apresentação; o resto vai para o login
+  url.pathname = req.nextUrl.pathname === "/" ? "/conheca" : "/login";
   url.search = "";
   return NextResponse.redirect(url);
 }
 
 export const config = {
   // api/cron: chamado pela Vercel sem cookie; a rota confere o CRON_SECRET
-  matcher: ["/((?!login|senha/|cadastro|termos|privacidade|api/cron|api/asaas|api/health|_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|apple-icon.png|icon-192.png|icon-512.png|sw.js).*)"],
+  matcher: ["/((?!login|senha/|conheca|apresentacao/|cadastro|termos|privacidade|api/cron|api/asaas|api/health|_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|apple-icon.png|icon-192.png|icon-512.png|sw.js).*)"],
 };
