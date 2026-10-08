@@ -37,7 +37,7 @@ export function BarChart({
 }) {
   const W = 720;
   const H = height;
-  const pad = { top: 22, right: 8, bottom: 26, left: 58 };
+  const pad = { top: 22, right: 8, bottom: 26, left: 74 };
   const iw = W - pad.left - pad.right;
   const ih = H - pad.top - pad.bottom;
   const max = niceMax(Math.max(0, ...data.map((d) => d.value)));

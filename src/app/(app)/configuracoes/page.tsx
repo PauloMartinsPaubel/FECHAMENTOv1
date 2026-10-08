@@ -7,6 +7,8 @@ import { emailProvider } from "@/server/email/provider";
 import { prisma } from "@/server/db";
 import { getSettings, loadCatalogRows } from "@/server/loaders";
 import { CreateUnitForm } from "../usuarios/access-forms";
+import { DemoButton } from "@/components/demo-button";
+import { DEMO_UNIT_NAME, demoStatus } from "@/server/services/demo";
 import { CatalogRow, NewCatalogItem, SettingsForm, WeeklyNowButton } from "./forms";
 
 export const metadata: Metadata = { title: "Configurações" };
@@ -20,6 +22,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     prisma.restaurant.findUniqueOrThrow({ where: { id: user.restaurantId } }),
   ]);
   const provider = emailProvider();
+  // a demonstração é ferramenta de venda do dono do sistema (conta isenta), não de clientes
+  const demo = restaurant.billingPlan === "EXEMPT" && restaurant.name !== DEMO_UNIT_NAME ? await demoStatus(user.userId) : "ready";
+  const canDemo = demo !== "ready";
 
   return (
     <div className="space-y-6">
@@ -95,6 +100,18 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <p className="mb-3 text-sm text-stone-600">Para quem tem mais de um restaurante. A nova unidade tem caixa, cadastros, relatórios e assinatura próprios; você entra nela com o mesmo login e troca no seletor do topo.</p>
         <CreateUnitForm />
       </section>
+
+      {canDemo ? (
+        <section className="card">
+          <h2 className="card-title">Demonstração para clientes</h2>
+          <p className="mb-3 text-sm text-stone-600">
+            Cria a unidade &quot;{DEMO_UNIT_NAME}&quot; com seis semanas de caixas fictícios (vendas, sangrias, conferências, algumas diferenças justificadas)
+            e um caixa de hoje aberto. Serve para apresentar o sistema e tirar telas sem mostrar os números do seu restaurante. Os dados do seu restaurante não mudam.
+          </p>
+          {demo === "incomplete" ? <p className="mb-3 text-sm text-amber-800">A geração anterior foi interrompida antes do fim. O botão continua de onde parou.</p> : null}
+          <DemoButton resume={demo === "incomplete"} />
+        </section>
+      ) : null}
     </div>
   );
 }

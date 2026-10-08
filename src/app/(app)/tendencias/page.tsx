@@ -36,7 +36,7 @@ export default async function TrendsPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Tendências" subtitle={`Últimos 12 ${by === "semana" ? "semanas" : "meses"}, só caixas fechados. O faturamento não inclui o fundo de caixa.`} />
+      <PageHeader title="Tendências" subtitle={`${by === "semana" ? "Últimas 12 semanas" : "Últimos 12 meses"}, só caixas fechados. O faturamento não inclui o fundo de caixa.`} />
 
       <div className="flex gap-2" role="group" aria-label="Agrupar por">
         {(["semana", "mes"] as const).map((g) => (
@@ -48,10 +48,10 @@ export default async function TrendsPage({ searchParams }: { searchParams: Promi
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label={`Média por ${unit}`} value={formatBRL(s.averageCents)} hint={`${unit === "semana" ? "Semanas" : "Meses"} completos com caixa fechado`} />
+        <Stat label={`Média por ${unit}`} value={formatBRL(s.averageCents)} hint={unit === "semana" ? "Semanas completas com caixa fechado" : "Meses completos com caixa fechado"} />
         <Stat label={`Melhor ${unit}`} value={s.best ? formatBRL(s.best.revenueCents) : "-"} hint={s.best?.longLabel} />
         <Stat
-          label={`Último ${unit} completo`}
+          label={unit === "semana" ? "Última semana completa" : "Último mês completo"}
           value={s.lastComplete ? formatBRL(s.lastComplete.revenueCents) : "-"}
           hint={s.changePct === null ? "Sem base de comparação" : `${s.changePct > 0 ? "+" : ""}${s.changePct.toLocaleString("pt-BR")}% sobre o anterior`}
           tone={s.changePct === null ? "default" : s.changePct >= 0 ? "good" : "warn"}
