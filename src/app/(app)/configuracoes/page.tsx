@@ -85,6 +85,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       </Catalog>
 
       <section className="card">
+        <h2 className="card-title">Seus dados</h2>
+        <p className="mb-3 text-sm text-stone-600">Baixe tudo o que o restaurante lançou no sistema, numa pasta compactada com uma planilha por assunto: caixas, vendas, conferências, fechamentos, correções, usuários e auditoria. Senhas não vão junto.</p>
+        <a href="/api/exportacao-completa" className="btn-secondary">Baixar todos os dados (.zip)</a>
+      </section>
+
+      <section className="card">
         <h2 className="card-title">Outra unidade</h2>
         <p className="mb-3 text-sm text-stone-600">Para quem tem mais de um restaurante. A nova unidade tem caixa, cadastros, relatórios e assinatura próprios; você entra nela com o mesmo login e troca no seletor do topo.</p>
         <CreateUnitForm />
