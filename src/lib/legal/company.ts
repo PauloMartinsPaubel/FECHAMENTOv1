@@ -6,7 +6,7 @@ export const COMPANY = {
   name: "[preencher: razão social]",
   document: "[preencher: CNPJ]",
   address: "[preencher: endereço completo]",
-  email: "[preencher: e-mail de contato]",
+  email: "fechamentodecaixaonline@gmail.com",
   dpoEmail: "[preencher: e-mail do encarregado de dados]",
   forum: "[preencher: cidade/UF do foro]",
 };

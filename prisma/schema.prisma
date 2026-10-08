@@ -752,3 +752,16 @@ model PasswordReset {
   @@index([userId, createdAt])
   @@map("password_resets")
 }
+
+/// Visitas e cliques da página de apresentação. Sem IP, sem cookie: só o tipo, de onde veio e quando.
+model SiteEvent {
+  id        String   @id @default(uuid())
+  /// view | whatsapp | cadastro | entrar
+  kind      String
+  /// qual botão (topo, plano, rodape) ou o site de origem da visita (instagram.com, google.com)
+  source    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("site_events")
+}

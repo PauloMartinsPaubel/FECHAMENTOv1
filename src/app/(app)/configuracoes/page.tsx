@@ -8,6 +8,8 @@ import { prisma } from "@/server/db";
 import { getSettings, loadCatalogRows } from "@/server/loaders";
 import { CreateUnitForm } from "../usuarios/access-forms";
 import { DemoButton } from "@/components/demo-button";
+import { SiteStatsCard } from "@/components/site-stats-card";
+import { siteStats } from "@/server/services/site-stats";
 import { DEMO_UNIT_NAME, demoStatus } from "@/server/services/demo";
 import { CatalogRow, NewCatalogItem, SettingsForm, WeeklyNowButton } from "./forms";
 
@@ -25,6 +27,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   // a demonstração é ferramenta de venda do dono do sistema (conta isenta), não de clientes
   const demo = restaurant.billingPlan === "EXEMPT" && restaurant.name !== DEMO_UNIT_NAME ? await demoStatus(user.userId) : "ready";
   const canDemo = demo !== "ready";
+  // números da página de apresentação: só para a conta do dono do sistema
+  const isOwner = restaurant.billingPlan === "EXEMPT" && restaurant.name !== DEMO_UNIT_NAME;
+  const [week, month] = isOwner ? await Promise.all([siteStats(7), siteStats(30)]) : [null, null];
 
   return (
     <div className="space-y-6">
@@ -100,6 +105,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <p className="mb-3 text-sm text-stone-600">Para quem tem mais de um restaurante. A nova unidade tem caixa, cadastros, relatórios e assinatura próprios; você entra nela com o mesmo login e troca no seletor do topo.</p>
         <CreateUnitForm />
       </section>
+
+      {week && month ? (
+        <section className="card">
+          <h2 className="card-title">Página de apresentação</h2>
+          <p className="mb-3 text-sm text-stone-600">Quantas pessoas abriram a página e quantas clicaram para falar com você. Robôs e a prévia do link no WhatsApp não contam. Nenhum dado pessoal é guardado.</p>
+          <SiteStatsCard week={week} month={month} />
+        </section>
+      ) : null}
 
       {canDemo ? (
         <section className="card">

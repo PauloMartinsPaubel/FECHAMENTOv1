@@ -22,7 +22,7 @@ describe("cópia de segurança", () => {
   it("cobre todas as tabelas do banco, menos sessões de login e erros", async () => {
     const rows = await prisma.$queryRaw<{ t: string }[]>`SELECT table_name AS t FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name <> '_prisma_migrations'`;
     const all = rows.map((r) => r.t).sort();
-    expect([...BACKUP_TABLES, "auth_sessions", "error_events", "password_resets"].sort()).toEqual(all);
+    expect([...BACKUP_TABLES, "auth_sessions", "error_events", "password_resets", "site_events"].sort()).toEqual(all);
   });
 
   it("gera, apaga tudo e restaura com os mesmos dados", async () => {
