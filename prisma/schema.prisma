@@ -158,6 +158,7 @@ model User {
   restaurant   Restaurant    @relation(fields: [restaurantId], references: [id])
   role         Role          @relation(fields: [roleId], references: [id])
   authSessions AuthSession[]
+  passwordResets PasswordReset[]
   /// acesso a outras unidades além da principal (restaurantId)
   memberships  Membership[]
 
@@ -733,4 +734,21 @@ model ErrorEvent {
 
   @@index([lastSeenAt])
   @@map("error_events")
+}
+
+/// Pedido de "esqueci minha senha": link de uso único enviado por e-mail.
+model PasswordReset {
+  id        String    @id @default(uuid())
+  userId    String
+  /// SHA-256 do token. O token em si só existe no link do e-mail.
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  ip        String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("password_resets")
 }

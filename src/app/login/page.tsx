@@ -8,8 +8,9 @@ import { LoginForm } from "./login-form";
 export const metadata: Metadata = { title: "Entrar" };
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ senha?: string }> }) {
   if (await getCurrentUser()) redirect("/");
+  const { senha } = await searchParams;
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
@@ -18,8 +19,12 @@ export default async function LoginPage() {
           <h1 className="text-2xl font-bold tracking-tight">Fechamento de Caixa</h1>
           <p className="mt-1 text-sm text-stone-600">Entre com seu e-mail e senha</p>
         </div>
+        {senha ? (
+          <p role="status" className="mb-4 rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900">Senha nova salva. Entre com ela.</p>
+        ) : null}
         <div className="card">
           <LoginForm />
+          <p className="mt-4 text-center text-sm"><Link href="/senha/esqueci" className="link">Esqueci minha senha</Link></p>
         </div>
         {signupOpen() ? (
           <p className="mt-4 text-center text-sm text-stone-600">

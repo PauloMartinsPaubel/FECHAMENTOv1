@@ -5,7 +5,7 @@ import { opsRecipients, reportError } from "./monitoring";
 
 /**
  * Tabelas da cópia, na ordem de restauração (quem é referenciado vem antes).
- * Ficam de fora as sessões de login (tokens) e os erros do monitoramento: não fazem falta numa restauração.
+ * Ficam de fora as sessões de login e os links de troca de senha (tokens) e os erros do monitoramento: não fazem falta numa restauração.
  */
 export const BACKUP_TABLES = [
   "roles", "restaurants", "settings", "cash_registers", "shifts", "sales_channels", "payment_methods", "ticket_brands",
