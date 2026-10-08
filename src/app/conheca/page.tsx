@@ -41,8 +41,10 @@ const FAQ = [
 export default function LandingPage() {
   const price = priceCentsFromEnv();
   const open = signupOpen();
-  const whatsapp = SUPPORT.whatsapp ? `https://wa.me/${SUPPORT.whatsapp}?text=${encodeURIComponent("Olá! Quero conhecer o Fechamento de Caixa.")}` : null;
-  const cta = open ? { href: "/cadastro", label: `Testar ${TRIAL_DAYS} dias grátis` } : whatsapp ? { href: whatsapp, label: "Falar no WhatsApp" } : null;
+  const whatsapp = SUPPORT.whatsapp ? `https://wa.me/${SUPPORT.whatsapp}?text=${encodeURIComponent(`Olá! Quero testar o Fechamento de Caixa por ${TRIAL_DAYS} dias.`)}` : null;
+  // o cadastro pede código de convite: quem chega pela página pede o teste no WhatsApp; quem já tem o código cadastra direto
+  const cta = whatsapp ? { href: whatsapp, label: `Quero testar ${TRIAL_DAYS} dias grátis` } : open ? { href: "/cadastro", label: `Testar ${TRIAL_DAYS} dias grátis` } : null;
+  const inviteLink = open && whatsapp ? <Link href="/cadastro" className="link">Já tenho um código de convite</Link> : null;
 
   return (
     <div className="bg-[#F6F4EE] text-stone-900">
@@ -68,6 +70,7 @@ export default function LandingPage() {
             <a href="#como-funciona" className="btn-secondary px-6">Ver como funciona</a>
           </div>
           <p className="mt-3 text-sm text-stone-500">Feito dentro de um restaurante de verdade, que usa o sistema todo dia.</p>
+          {inviteLink ? <p className="mt-2 text-sm">{inviteLink}</p> : null}
         </div>
         <img src="/apresentacao/lancamentos.png" alt="Tela de lançamentos com os botões de lançamento rápido" width={1200} height={800} className="w-full rounded-2xl border border-stone-200 bg-white shadow-xl" />
       </section>
@@ -146,6 +149,7 @@ export default function LandingPage() {
             PIX, boleto ou cartão. Cancele quando quiser, sem multa. Se uma mensalidade atrasar, o sistema continua funcionando por {GRACE_DAYS} dias, e nenhum dado é apagado.
           </p>
           {cta ? <a href={cta.href} className="mt-8 inline-flex min-h-11 items-center rounded-lg bg-white px-6 font-semibold text-brand-700 hover:bg-green-50">{cta.label}</a> : null}
+          {inviteLink ? <p className="mt-3 text-sm text-green-50"><Link href="/cadastro" className="underline">Já tenho um código de convite</Link></p> : null}
         </div>
       </section>
 
