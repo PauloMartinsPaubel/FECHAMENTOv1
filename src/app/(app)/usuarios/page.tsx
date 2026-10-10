@@ -6,7 +6,7 @@ import { clientIp, requirePermission } from "@/server/auth/current";
 import { listUsers } from "@/server/services/admin";
 import { listGrantedAccess } from "@/server/services/units";
 import { CreateUserForm, UserRow } from "./user-forms";
-import { GrantAccessForm, RevokeAccessButton } from "./access-forms";
+import { GrantAccessForm, ResetTwoFactorButton, RevokeAccessButton } from "./access-forms";
 
 export const metadata: Metadata = { title: "Usuários" };
 
@@ -31,10 +31,12 @@ export default async function UsersPage() {
                 <div className="flex items-center gap-2 text-xs text-stone-500">
                   {u.active ? <Badge kind="CORRETO">Ativo</Badge> : <Badge kind="CLOSED">Desativado</Badge>}
                   {u.mustChangePassword ? <Badge kind="REOPENED">Troca de senha pendente</Badge> : null}
+                  {u.totpEnabledAt ? <Badge kind="CORRETO">Duas etapas</Badge> : null}
                   {u.lastLoginAt ? `último acesso ${formatDateTimeBR(u.lastLoginAt)}` : "nunca entrou"}
                 </div>
               </div>
               <UserRow user={{ id: u.id, name: u.name, role: u.role.code, active: u.active }} isSelf={u.id === user.userId} roleLabels={ROLE_LABEL} />
+              {u.totpEnabledAt && u.id !== user.userId ? <ResetTwoFactorButton userId={u.id} /> : null}
             </li>
           ))}
         </ul>

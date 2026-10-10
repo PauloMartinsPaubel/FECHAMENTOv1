@@ -27,7 +27,12 @@ export interface LoginResult {
   token: string;
   expiresAt: Date;
   mustChangePassword: boolean;
+  /** senha certa, mas a pessoa ligou a verificação em duas etapas: falta o código */
+  pendingTwoFactor: boolean;
 }
+
+/** Tempo para digitar o código depois de acertar a senha. */
+const SECOND_STEP_MS = 10 * 60_000;
 
 export async function loginWithPassword(email: string, password: string, meta: LoginMeta = {}): Promise<LoginResult> {
   const normalized = email.trim().toLowerCase();
@@ -65,17 +70,20 @@ export async function loginWithPassword(email: string, password: string, meta: L
   }
 
   const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(Date.now() + SESSION_HOURS * 3600_000);
+  const pendingTwoFactor = Boolean(user.totpEnabledAt);
+  // com a verificação em duas etapas, a sessão nasce sem acesso e vale só alguns minutos, até o código
+  const expiresAt = new Date(Date.now() + (pendingTwoFactor ? SECOND_STEP_MS : SESSION_HOURS * 3600_000));
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: user.id },
-      data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date() },
+      data: { failedLogins: 0, lockedUntil: null, ...(pendingTwoFactor ? {} : { lastLoginAt: new Date() }) },
     });
     await tx.authSession.create({
       data: {
         userId: user.id,
         tokenHash: hashToken(token),
         expiresAt,
+        pendingTwoFactor,
         ip: meta.ip ?? undefined,
         userAgent: meta.userAgent?.slice(0, 300),
       },
@@ -83,10 +91,10 @@ export async function loginWithPassword(email: string, password: string, meta: L
     await audit(
       tx,
       { userId: user.id, name: user.name, email: user.email, role: user.role.code, restaurantId: user.restaurantId, ip: meta.ip },
-      { action: "login", entity: "user", entityId: user.id },
+      { action: pendingTwoFactor ? "login.password_ok" : "login", entity: "user", entityId: user.id },
     );
   });
-  return { token, expiresAt, mustChangePassword: user.mustChangePassword };
+  return { token, expiresAt, mustChangePassword: user.mustChangePassword, pendingTwoFactor };
 }
 
 export interface CurrentUser extends Actor {
@@ -102,6 +110,8 @@ export async function userFromToken(token: string | undefined | null, ip?: strin
     include: { user: { include: { role: true } } },
   });
   if (!session) return null;
+  // acertou a senha mas ainda não digitou o código: não dá acesso a nada
+  if (session.pendingTwoFactor) return null;
   if (session.expiresAt <= new Date() || !session.user.active) {
     await prisma.authSession.delete({ where: { id: session.id } }).catch(() => undefined);
     return null;

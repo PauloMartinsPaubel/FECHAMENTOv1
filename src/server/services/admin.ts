@@ -27,6 +27,8 @@ export async function listUsers(actor: Actor) {
   return prisma.user.findMany({
     where: { restaurantId: actor.restaurantId },
     include: { role: true },
+    // segredos nunca saem do serviço, nem para a tela de administração
+    omit: { passwordHash: true, totpSecretEnc: true, totpPendingEnc: true, recoveryCodeHashes: true, totpLastStep: true },
     orderBy: [{ active: "desc" }, { name: "asc" }],
   });
 }

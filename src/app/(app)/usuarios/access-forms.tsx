@@ -3,6 +3,7 @@
 import { ActionForm } from "@/components/action-form";
 import { Field } from "@/components/ui";
 import { createUnitAction, grantAccessAction, revokeAccessAction } from "@/app/actions/units";
+import { adminResetTwoFactorAction } from "@/app/actions/account";
 
 export function GrantAccessForm() {
   return (
@@ -30,5 +31,18 @@ export function CreateUnitForm() {
       <Field label="Nome da nova unidade" htmlFor="unit-name"><input id="unit-name" name="name" required minLength={2} maxLength={100} className="input" /></Field>
       <button type="submit" className="btn-primary">Criar unidade</button>
     </ActionForm>
+  );
+}
+
+/** Para quem perdeu o celular e os códigos de recuperação. */
+export function ResetTwoFactorButton({ userId }: { userId: string }) {
+  return (
+    <details className="mt-3">
+      <summary className="cursor-pointer text-sm font-medium text-brand-700">Desligar a verificação em duas etapas desta pessoa</summary>
+      <ActionForm action={adminResetTwoFactorAction} hidden={{ userId }} className="mt-2 flex flex-wrap items-center gap-3">
+        <p className="text-sm text-stone-600">Use só se a pessoa perdeu o celular e os códigos de recuperação. Ela sai de todos os aparelhos e entra de novo só com a senha.</p>
+        <button type="submit" className="btn-secondary btn-sm">Desligar</button>
+      </ActionForm>
+    </details>
   );
 }

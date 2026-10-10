@@ -41,9 +41,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </Link>
           <div className="flex items-center gap-3 text-sm">
             {units.length > 1 && !user.mustChangePassword ? <UnitSwitcher units={units} current={user.restaurantId} /> : null}
-            <span className="text-stone-600">
+            <Link href="/conta" className="text-stone-600 hover:underline" title="Minha conta: senha, verificação em duas etapas e aparelhos conectados">
               {user.name} <span className="text-stone-400">({ROLE_LABEL[user.role]})</span>
-            </span>
+            </Link>
             <form action={logoutAction}>
               <button type="submit" className="btn-secondary btn-sm">Sair</button>
             </form>

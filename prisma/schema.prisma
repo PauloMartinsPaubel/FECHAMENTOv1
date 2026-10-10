@@ -157,6 +157,15 @@ model User {
 
   restaurant   Restaurant    @relation(fields: [restaurantId], references: [id])
   role         Role          @relation(fields: [roleId], references: [id])
+  /// verificação em duas etapas: segredo do aplicativo autenticador, cifrado; null = desligada
+  totpSecretEnc      String?
+  /// segredo gerado e ainda não confirmado com um código
+  totpPendingEnc     String?
+  totpEnabledAt      DateTime?
+  /// último intervalo de 30 s aceito: o mesmo código não serve duas vezes
+  totpLastStep       Int?
+  /// códigos de recuperação (só o hash; cada um vale uma vez)
+  recoveryCodeHashes String[] @default([])
   authSessions AuthSession[]
   passwordResets PasswordReset[]
   /// acesso a outras unidades além da principal (restaurantId)
@@ -187,6 +196,9 @@ model AuthSession {
   ip         String?
   userAgent  String?
   /// unidade escolhida no seletor; null = a unidade principal do usuário
+  /// senha certa, falta o código da verificação em duas etapas: ainda não dá acesso a nada
+  pendingTwoFactor   Boolean  @default(false)
+  twoFactorAttempts  Int      @default(0)
   activeRestaurantId String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
