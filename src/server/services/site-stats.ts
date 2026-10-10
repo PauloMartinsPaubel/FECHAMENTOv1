@@ -1,4 +1,5 @@
 import { prisma } from "../db";
+import { hit } from "./rate-limit";
 
 export const SITE_EVENT_KINDS = ["view", "whatsapp", "cadastro", "entrar"] as const;
 export type SiteEventKind = (typeof SITE_EVENT_KINDS)[number];
@@ -22,8 +23,10 @@ export function sourceFromReferrer(referrer: string | null | undefined, ownHost:
 }
 
 /** Grava sem nunca derrubar a página. */
-export async function recordSiteEvent(kind: SiteEventKind, source: string | null, userAgent?: string | null): Promise<void> {
+export async function recordSiteEvent(kind: SiteEventKind, source: string | null, userAgent?: string | null, ip?: string | null): Promise<void> {
   if (isBot(userAgent)) return;
+  // alguém recarregando a página sem parar não infla os números
+  if (ip && !(await hit("site", ip)).allowed) return;
   try {
     await prisma.siteEvent.create({ data: { kind, source: source?.slice(0, 80) ?? null } });
   } catch (err) {

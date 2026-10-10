@@ -2,10 +2,12 @@ import { gunzipSync, gzipSync, strFromU8, strToU8 } from "fflate";
 import { prisma } from "../db";
 import { defaultFrom, emailProvider, sendMail } from "../email/provider";
 import { opsRecipients, reportError } from "./monitoring";
+import { purgeOldHits } from "./rate-limit";
 
 /**
  * Tabelas da cópia, na ordem de restauração (quem é referenciado vem antes).
- * Ficam de fora as sessões de login e os links de troca de senha (tokens), os erros do monitoramento e as visitas da página de apresentação: não fazem falta numa restauração.
+ * Ficam de fora as sessões de login e os links de troca de senha (tokens), os erros do monitoramento, as visitas da página de apresentação
+ * e o registro de tentativas: não fazem falta numa restauração.
  */
 export const BACKUP_TABLES = [
   "roles", "restaurants", "settings", "cash_registers", "shifts", "sales_channels", "payment_methods", "ticket_brands",
@@ -70,6 +72,7 @@ export async function restoreBackup(file: Uint8Array): Promise<Record<string, nu
 /** Rotina da madrugada: gera a cópia e manda por e-mail para o suporte. */
 export async function runNightlyBackup(now = new Date(), send = sendMail) {
   const to = opsRecipients();
+  await purgeOldHits(now).catch(() => 0);
   if (!to.length || emailProvider() === "none") return { sent: false, reason: "Sem OPS_ALERT_EMAIL ou envio de e-mail configurado." };
   try {
     const { file, counts } = await createBackup(now);

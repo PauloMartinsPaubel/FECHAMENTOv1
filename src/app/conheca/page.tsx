@@ -65,7 +65,8 @@ export default async function LandingPage() {
   if (!h.get("next-router-prefetch") && h.get("purpose") !== "prefetch") {
     const ua = h.get("user-agent");
     const source = sourceFromReferrer(h.get("referer"), h.get("host"));
-    after(() => recordSiteEvent("view", source, ua));
+    const ip = h.get("x-forwarded-for")?.split(",")[0].trim() || h.get("x-real-ip");
+    after(() => recordSiteEvent("view", source, ua, ip));
   }
   const hasWhatsapp = Boolean(SUPPORT.whatsapp);
   // o cadastro pede código de convite: quem chega pela página pede o teste no WhatsApp; quem já tem o código cadastra direto

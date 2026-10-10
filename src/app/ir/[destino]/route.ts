@@ -11,6 +11,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ destino: st
   const { destino } = await ctx.params;
   const from = (req.nextUrl.searchParams.get("de") ?? "").replace(/[^a-z]/g, "").slice(0, 20) || null;
   const ua = req.headers.get("user-agent");
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip");
   let target: string;
   let kind: "whatsapp" | "cadastro" | "entrar";
   if (destino === "whatsapp" && SUPPORT.whatsapp) {
@@ -25,6 +26,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ destino: st
   } else {
     return NextResponse.redirect(new URL("/conheca", req.url));
   }
-  after(() => recordSiteEvent(kind, from, ua));
+  after(() => recordSiteEvent(kind, from, ua, ip));
   return NextResponse.redirect(target, 302);
 }

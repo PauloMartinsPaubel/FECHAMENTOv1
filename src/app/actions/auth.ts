@@ -5,6 +5,7 @@ import { clearSessionCookie, clientIp, readToken, requireUser, setSessionCookie 
 import { changeOwnPassword, loginWithPassword, logout } from "@/server/services/auth";
 import { headers } from "next/headers";
 import { ServiceError } from "@/server/errors";
+import { enforce } from "@/server/services/rate-limit";
 import { run, str } from "./util";
 import type { ActionState } from "./types";
 
@@ -14,7 +15,9 @@ export async function loginAction(_prev: ActionState, fd: FormData): Promise<Act
     const password = String(fd.get("password") ?? "");
     if (!email || !password) throw new ServiceError("Informe e-mail e senha.");
     const h = await headers();
-    const r = await loginWithPassword(email, password, { ip: await clientIp(), userAgent: h.get("user-agent") });
+    const ip = await clientIp();
+    await enforce("login", ip);
+    const r = await loginWithPassword(email, password, { ip, userAgent: h.get("user-agent") });
     await setSessionCookie(r.token, r.expiresAt);
   });
   if (result?.ok) redirect("/");

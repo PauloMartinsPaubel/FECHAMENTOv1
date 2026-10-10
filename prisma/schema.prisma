@@ -765,3 +765,15 @@ model SiteEvent {
   @@index([createdAt])
   @@map("site_events")
 }
+
+/// Tentativas recentes por endereço de internet (login, troca de senha, cadastro). O endereço fica só como hash.
+model RateLimitHit {
+  id        String   @id @default(uuid())
+  bucket    String
+  keyHash   String
+  createdAt DateTime @default(now())
+
+  @@index([bucket, keyHash, createdAt])
+  @@index([createdAt])
+  @@map("rate_limit_hits")
+}

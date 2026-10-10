@@ -6,11 +6,13 @@ import { clientIp, setSessionCookie } from "@/server/auth/current";
 import { loginWithPassword } from "@/server/services/auth";
 import { registerRestaurant } from "@/server/services/signup";
 import type { ActionState } from "./types";
+import { enforce } from "@/server/services/rate-limit";
 import { bool, run, str } from "./util";
 
 export async function signupAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const result = await run(async () => {
     const ip = await clientIp();
+    await enforce("cadastro", ip);
     const password = String(fd.get("password") ?? "");
     const r = await registerRestaurant(
       {
