@@ -7,7 +7,6 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
@@ -28,7 +27,7 @@
     "bcryptjs": "^3.0.3",
     "dotenv": "^18.0.5",
     "fflate": "^0.8.3",
-    "next": "^15.5.27",
+    "next": "^16.4.0",
     "nodemailer": "^10.0.13",
     "pg": "^8.23.1",
     "qrcode": "^1.5.4",
@@ -54,6 +53,6 @@
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "5.9",
-    "vitest": "^3.2.7"
+    "vitest": "^5.0.3"
   }
 }

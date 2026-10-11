@@ -39,7 +39,7 @@ function newNonce(): string {
  * A validação de verdade (token no banco, expiração, usuário ativo, permissão) acontece no servidor,
  * em cada página e em cada ação.
  */
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const policy = contentPolicy(newNonce());
   const path = req.nextUrl.pathname;
   if (!PUBLIC.test(path) && !req.cookies.get(COOKIE)?.value) {
