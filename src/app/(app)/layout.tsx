@@ -26,8 +26,9 @@ const NAV: { href: string; label: string; perm?: Permission }[] = [
 ];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireUser({ allowPasswordChange: true });
-  const items = user.mustChangePassword ? [] : NAV.filter((n) => !n.perm || can(user.role, n.perm));
+  const user = await requireUser({ allowPasswordChange: true, allowTwoFactorSetup: true });
+  const blocked = user.mustChangePassword || user.mustSetupTwoFactor;
+  const items = blocked ? [] : NAV.filter((n) => !n.perm || can(user.role, n.perm));
   const access = await getAccessState(user.restaurantId).catch(() => null);
   const isAdmin = can(user.role, "settings.manage");
   const units = await listAccessibleUnits(user.userId).catch(() => []);
@@ -40,7 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span>Fechamento de Caixa</span>
           </Link>
           <div className="flex items-center gap-3 text-sm">
-            {units.length > 1 && !user.mustChangePassword ? <UnitSwitcher units={units} current={user.restaurantId} /> : null}
+            {units.length > 1 && !blocked ? <UnitSwitcher units={units} current={user.restaurantId} /> : null}
             <Link href="/conta" className="text-stone-600 hover:underline" title="Minha conta: senha, verificação em duas etapas e aparelhos conectados">
               {user.name} <span className="text-stone-400">({ROLE_LABEL[user.role]})</span>
             </Link>

@@ -28,7 +28,7 @@ export async function loginAction(_prev: ActionState, fd: FormData): Promise<Act
 }
 
 export async function logoutAction(): Promise<void> {
-  const user = await requireUser({ allowPasswordChange: true });
+  const user = await requireUser({ allowPasswordChange: true, allowTwoFactorSetup: true });
   await logout({ ...user, ip: await clientIp() }, await readToken());
   await clearSessionCookie();
   redirect("/login");
@@ -36,7 +36,7 @@ export async function logoutAction(): Promise<void> {
 
 export async function changePasswordAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const result = await run(async () => {
-    const user = await requireUser({ allowPasswordChange: true });
+    const user = await requireUser({ allowPasswordChange: true, allowTwoFactorSetup: true });
     const actor = { ...user, ip: await clientIp() };
     const next = String(fd.get("next") ?? "");
     if (next !== String(fd.get("confirm") ?? "")) throw new ServiceError("A confirmação não confere com a nova senha.");

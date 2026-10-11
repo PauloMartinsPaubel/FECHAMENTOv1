@@ -11,17 +11,19 @@ import { DemoButton } from "@/components/demo-button";
 import { SiteStatsCard } from "@/components/site-stats-card";
 import { siteStats } from "@/server/services/site-stats";
 import { DEMO_UNIT_NAME, demoStatus } from "@/server/services/demo";
-import { CatalogRow, NewCatalogItem, SettingsForm, WeeklyNowButton } from "./forms";
+import { twoFactorPolicy } from "@/server/services/two-factor";
+import { CatalogRow, NewCatalogItem, SettingsForm, TwoFactorPolicyForm, WeeklyNowButton } from "./forms";
 
 export const metadata: Metadata = { title: "Configurações" };
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const welcome = (await searchParams).inicio === "1";
   const user = await requirePermission("settings.manage");
-  const [settings, catalog, restaurant] = await Promise.all([
+  const [settings, catalog, restaurant, policy] = await Promise.all([
     getSettings(prisma, user.restaurantId),
     loadCatalogRows(prisma, user.restaurantId),
     prisma.restaurant.findUniqueOrThrow({ where: { id: user.restaurantId } }),
+    twoFactorPolicy(user.restaurantId),
   ]);
   const provider = emailProvider();
   // a demonstração é ferramenta de venda do dono do sistema (conta isenta), não de clientes
@@ -93,6 +95,24 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <Catalog title="Tickets e vales (bandeiras)" kind="brand" help="Cada bandeira é conferida separadamente (Alelo, VR, Ticket Restaurante, Pluxee, Ben e outras).">
         {catalog.brands.map((b) => <CatalogRow key={b.id} kind="brand" item={{ id: b.id, name: b.name, active: b.active }} />)}
       </Catalog>
+
+      {policy.available ? (
+        <section className="card">
+          <h2 className="card-title">Segurança da equipe</h2>
+          <p className="mb-3 text-sm text-stone-600">
+            Com a opção ligada, administradores e gerentes só usam o sistema depois de ligar a verificação em duas etapas (código do aplicativo no celular, além da senha).
+            Quem ainda não ligou é levado direto para isso no próximo acesso. Operadores não são afetados.
+          </p>
+          <TwoFactorPolicyForm required={policy.required} />
+          {policy.total > 0 ? (
+            <p className="mt-3 text-sm text-stone-600">
+              {policy.pending.length === 0
+                ? "Todos os administradores e gerentes já ligaram a verificação."
+                : `Ainda sem a verificação ligada: ${policy.pending.join(", ")}.`}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="card">
         <h2 className="card-title">Seus dados</h2>

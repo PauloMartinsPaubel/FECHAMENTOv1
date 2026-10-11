@@ -37,12 +37,25 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   return userFromToken(token, await clientIp());
 });
 
-/** Exige login; redireciona para /login. Redireciona para troca de senha se for o primeiro acesso. */
-export async function requireUser(options: { allowPasswordChange?: boolean } = {}): Promise<CurrentUser> {
+/**
+ * Exige login; redireciona para /login. Redireciona para troca de senha se for o primeiro acesso e,
+ * depois dela, para Minha conta se o restaurante exige a verificação em duas etapas e falta ligar.
+ */
+export async function requireUser(options: { allowPasswordChange?: boolean; allowTwoFactorSetup?: boolean } = {}): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.mustChangePassword && !options.allowPasswordChange) redirect("/conta/senha");
+  if (user.mustChangePassword) {
+    if (!options.allowPasswordChange) redirect("/conta/senha");
+    return user;
+  }
+  if (user.mustSetupTwoFactor && !options.allowTwoFactorSetup) redirect("/conta?exigido=1");
   return user;
+}
+
+/** Para downloads e rotas de API: só quem já está liberado (sem troca de senha nem verificação pendente). */
+export async function getApiUser(): Promise<CurrentUser | null> {
+  const user = await getCurrentUser();
+  return user && !user.mustChangePassword && !user.mustSetupTwoFactor ? user : null;
 }
 
 /** Exige login e permissão; sem permissão vai para a página inicial com aviso. */

@@ -4,6 +4,7 @@ import { ActionForm } from "@/components/action-form";
 import { MoneyInput } from "@/components/money-input";
 import { Field } from "@/components/ui";
 import { saveCatalogAction, saveSettingsAction, sendWeeklyNowAction } from "@/app/actions/admin";
+import { twoFactorPolicyAction } from "@/app/actions/account";
 
 export function SettingsForm({
   values,
@@ -105,6 +106,19 @@ export function NewCatalogItem({ kind }: { kind: "register" | "channel" | "metho
       ) : null}
       {kind === "channel" ? <label className="flex items-center gap-2 pb-2.5 text-sm"><input type="checkbox" name="isPlatform" /> Plataforma</label> : null}
       <button type="submit" className="btn-primary">Adicionar</button>
+    </ActionForm>
+  );
+}
+
+/** Liga ou desliga a exigência da verificação em duas etapas para administradores e gerentes. */
+export function TwoFactorPolicyForm({ required }: { required: boolean }) {
+  return (
+    <ActionForm action={twoFactorPolicyAction} className="flex flex-wrap items-center gap-3">
+      <label className="flex items-center gap-2 text-sm font-medium">
+        <input type="checkbox" name="required" defaultChecked={required} />
+        Exigir verificação em duas etapas de administradores e gerentes
+      </label>
+      <button type="submit" className="btn-secondary">Salvar</button>
     </ActionForm>
   );
 }

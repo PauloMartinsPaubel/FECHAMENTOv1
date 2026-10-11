@@ -11,12 +11,15 @@ export const metadata: Metadata = { title: "Minha conta" };
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
-  const user = await requireUser();
+  const user = await requireUser({ allowTwoFactorSetup: true });
   const actor = { ...user, ip: await clientIp() };
   const [tf, sessions] = await Promise.all([twoFactorStatus(user.userId), listMySessions(actor)]);
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader title="Minha conta" subtitle={`${user.name} · ${user.email} · ${ROLE_LABEL[user.role]}`} />
+      {user.mustSetupTwoFactor ? (
+        <Alert tone="warn">O restaurante exige a verificação em duas etapas de administradores e gerentes. Ligue abaixo para continuar usando o sistema; leva uns dois minutos.</Alert>
+      ) : null}
 
       <section className="card">
         <h2 className="card-title">Senha</h2>

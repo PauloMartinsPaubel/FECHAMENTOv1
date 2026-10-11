@@ -16,7 +16,7 @@ import {
   otpauthUrl,
   verifyCode,
 } from "../security/totp";
-import { hashToken, SESSION_HOURS } from "./auth";
+import { hashToken, SESSION_HOURS, TWO_FACTOR_POLICY_ROLES } from "./auth";
 
 /** Depois da senha certa, quanto tempo a pessoa tem para digitar o código. */
 export const SECOND_STEP_MINUTES = 10;
@@ -105,6 +105,43 @@ export async function adminResetTwoFactor(actor: Actor, userId: string) {
     prisma.authSession.deleteMany({ where: { userId: u.id } }),
   ]);
   await audit(prisma, actor, { action: "user.2fa_reset_by_admin", entity: "user", entityId: u.id, newValue: { email: u.email } });
+}
+
+// ---------------------------------------------------------------------------
+// Regra do restaurante: exigir de administradores e gerentes
+// ---------------------------------------------------------------------------
+
+/** Situação da regra numa unidade: ligada ou não e quem (administradores e gerentes) ainda não ligou a sua. */
+export async function twoFactorPolicy(restaurantId: string) {
+  const roles = { code: { in: TWO_FACTOR_POLICY_ROLES } };
+  const [setting, people] = await Promise.all([
+    prisma.setting.findUnique({ where: { restaurantId }, select: { requireTwoFactor: true } }),
+    prisma.user.findMany({
+      where: { active: true, OR: [{ restaurantId, role: roles }, { memberships: { some: { restaurantId, active: true, role: roles } } }] },
+      select: { name: true, totpEnabledAt: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+  return {
+    required: Boolean(setting?.requireTwoFactor),
+    available: encryptionAvailable(),
+    total: people.length,
+    pending: people.filter((p) => !p.totpEnabledAt).map((p) => p.name),
+  };
+}
+
+export async function setTwoFactorPolicy(actor: Actor, required: boolean) {
+  assertCan(actor, "settings.manage");
+  if (required) {
+    if (!encryptionAvailable()) throw new ServiceError("A verificação em duas etapas ainda não está configurada no servidor.", "STATE");
+    const me = await prisma.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { totpEnabledAt: true } });
+    if (!me.totpEnabledAt) throw new ServiceError("Ligue a sua verificação em duas etapas antes, em Minha conta. Assim você não fica de fora.", "STATE");
+  }
+  const before = await prisma.setting.findUnique({ where: { restaurantId: actor.restaurantId }, select: { requireTwoFactor: true } });
+  await prisma.$transaction(async (tx) => {
+    await tx.setting.upsert({ where: { restaurantId: actor.restaurantId }, update: { requireTwoFactor: required }, create: { restaurantId: actor.restaurantId, closingRecipients: [], requireTwoFactor: required } });
+    await audit(tx, actor, { action: "settings.2fa_policy", entity: "restaurant", entityId: actor.restaurantId, oldValue: { requireTwoFactor: Boolean(before?.requireTwoFactor) }, newValue: { requireTwoFactor: required } });
+  });
 }
 
 // ---------------------------------------------------------------------------

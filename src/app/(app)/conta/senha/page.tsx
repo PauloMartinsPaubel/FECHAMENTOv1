@@ -6,7 +6,7 @@ import { PasswordForm } from "./password-form";
 export const metadata: Metadata = { title: "Trocar senha" };
 
 export default async function PasswordPage() {
-  const user = await requireUser({ allowPasswordChange: true });
+  const user = await requireUser({ allowPasswordChange: true, allowTwoFactorSetup: true });
   return (
     <div className="mx-auto max-w-md">
       <PageHeader title="Trocar senha" />

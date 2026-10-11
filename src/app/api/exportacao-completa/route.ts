@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { clientIp, getCurrentUser } from "@/server/auth/current";
+import { clientIp, getApiUser } from "@/server/auth/current";
 import { errorMessage, ServiceError } from "@/server/errors";
 import { buildFullExport } from "@/server/services/full-export";
 
@@ -8,7 +8,7 @@ export const maxDuration = 60;
 
 /** Todos os dados do restaurante num .zip de planilhas. Só administrador. */
 export async function GET() {
-  const user = await getCurrentUser();
+  const user = await getApiUser();
   if (!user) return new NextResponse("Faça login para exportar.", { status: 401 });
   try {
     const out = await buildFullExport({ ...user, ip: await clientIp() });

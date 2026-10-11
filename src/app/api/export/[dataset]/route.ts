@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clientIp, getCurrentUser } from "@/server/auth/current";
+import { clientIp, getApiUser } from "@/server/auth/current";
 import { errorMessage, ServiceError } from "@/server/errors";
 import { buildExport, isDataset } from "@/server/reports/export";
 import { isIsoDate } from "@/lib/dates";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const opt = (v: string | null) => (v && v.trim() ? v.trim() : undefined);
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ dataset: string }> }) {
-  const user = await getCurrentUser();
+  const user = await getApiUser();
   if (!user) return new NextResponse("Faça login para exportar.", { status: 401 });
   const { dataset } = await ctx.params;
   if (!isDataset(dataset)) return new NextResponse("Exportação desconhecida.", { status: 404 });

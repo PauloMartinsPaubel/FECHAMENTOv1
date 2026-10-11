@@ -195,10 +195,10 @@ model AuthSession {
   lastSeenAt DateTime @default(now())
   ip         String?
   userAgent  String?
-  /// unidade escolhida no seletor; null = a unidade principal do usuário
   /// senha certa, falta o código da verificação em duas etapas: ainda não dá acesso a nada
   pendingTwoFactor   Boolean  @default(false)
   twoFactorAttempts  Int      @default(0)
+  /// unidade escolhida no seletor; null = a unidade principal do usuário
   activeRestaurantId String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -615,6 +615,8 @@ model Setting {
   alertThresholdCents     Int?
   /// quem recebe o resumo semanal (segunda de manhã); vazio = desligado
   weeklyRecipients        String[]  @default([])
+  /// administradores e gerentes só usam o sistema com a verificação em duas etapas ligada
+  requireTwoFactor        Boolean   @default(false)
   updatedAt               DateTime  @updatedAt
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id])

@@ -7,8 +7,8 @@ import type { ActionState } from "./types";
 import { reportError } from "@/server/services/monitoring";
 
 /** Usuário logado como Actor (com IP) para chamar os serviços. */
-export async function actorFromSession(): Promise<Actor> {
-  const user = await requireUser();
+export async function actorFromSession(options: Parameters<typeof requireUser>[0] = {}): Promise<Actor> {
+  const user = await requireUser(options);
   return { ...user, ip: await clientIp() };
 }
 

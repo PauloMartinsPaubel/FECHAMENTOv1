@@ -38,6 +38,7 @@ export async function getSettings(db: Db, restaurantId: string) {
       alertRecipients: [] as string[],
       alertThresholdCents: null as number | null,
       weeklyRecipients: [] as string[],
+      requireTwoFactor: false,
       updatedAt: new Date(),
     }
   );

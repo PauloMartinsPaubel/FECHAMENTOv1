@@ -6,6 +6,7 @@ import type { Actor } from "../actor";
 import { ServiceError } from "../errors";
 import type { RoleCode } from "@/lib/permissions";
 import { BCRYPT_COST } from "../seed";
+import { encryptionAvailable } from "../security/totp";
 
 export const SESSION_HOURS = 12;
 export const MAX_FAILED_LOGINS = 5;
@@ -99,8 +100,13 @@ export async function loginWithPassword(email: string, password: string, meta: L
 
 export interface CurrentUser extends Actor {
   mustChangePassword: boolean;
+  /** o restaurante exige a verificação em duas etapas deste papel e a pessoa ainda não ligou */
+  mustSetupTwoFactor: boolean;
   sessionId: string;
 }
+
+/** Papéis que a opção "exigir verificação em duas etapas" alcança. */
+export const TWO_FACTOR_POLICY_ROLES: RoleCode[] = ["ADMIN", "MANAGER"];
 
 /** Valida o token do cookie. Retorna null se não existir, expirou ou o usuário foi desativado. */
 export async function userFromToken(token: string | undefined | null, ip?: string | null): Promise<CurrentUser | null> {
@@ -133,6 +139,12 @@ export async function userFromToken(token: string | undefined | null, ip?: strin
       role = m.role.code as RoleCode;
     }
   }
+  // só consulta a regra do restaurante quando ela poderia valer para esta pessoa
+  let mustSetupTwoFactor = false;
+  if (!u.totpEnabledAt && TWO_FACTOR_POLICY_ROLES.includes(role) && encryptionAvailable()) {
+    const s = await prisma.setting.findUnique({ where: { restaurantId }, select: { requireTwoFactor: true } });
+    mustSetupTwoFactor = Boolean(s?.requireTwoFactor);
+  }
   return {
     userId: u.id,
     name: u.name,
@@ -141,6 +153,7 @@ export async function userFromToken(token: string | undefined | null, ip?: strin
     restaurantId,
     ip: ip ?? null,
     mustChangePassword: u.mustChangePassword,
+    mustSetupTwoFactor,
     sessionId: session.id,
   };
 }

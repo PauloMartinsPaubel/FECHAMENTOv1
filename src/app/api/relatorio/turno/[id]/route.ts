@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { formatDateBR } from "@/lib/dates";
 import { renderShiftReport, wrapDocument } from "@/lib/reports/html";
-import { clientIp, getCurrentUser } from "@/server/auth/current";
+import { clientIp, getApiUser } from "@/server/auth/current";
 import { errorMessage, ServiceError } from "@/server/errors";
 import { loadShiftReport } from "@/server/reports/shift-report";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /** Relatório do turno como documento HTML completo (para baixar ou abrir e imprimir). */
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
+  const user = await getApiUser();
   if (!user) return new NextResponse("Faça login para ver o relatório.", { status: 401 });
   const { id } = await ctx.params;
   try {
