@@ -182,7 +182,7 @@ export async function completeSecondStep(token: string | null | undefined, code:
     await audit(tx, who, { action: "login", entity: "user", entityId: u.id, newValue: { segundaEtapa: method } });
   });
   const left = method === "recuperacao" ? (await prisma.user.findUniqueOrThrow({ where: { id: u.id }, select: { recoveryCodeHashes: true } })).recoveryCodeHashes.length : null;
-  return { token: fresh, expiresAt, mustChangePassword: u.mustChangePassword, recoveryLeft: left };
+  return { userId: u.id, token: fresh, expiresAt, mustChangePassword: u.mustChangePassword, recoveryLeft: left };
 }
 
 // ---------------------------------------------------------------------------

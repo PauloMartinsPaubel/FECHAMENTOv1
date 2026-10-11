@@ -25,6 +25,7 @@ export interface LoginMeta {
 }
 
 export interface LoginResult {
+  userId: string;
   token: string;
   expiresAt: Date;
   mustChangePassword: boolean;
@@ -95,7 +96,7 @@ export async function loginWithPassword(email: string, password: string, meta: L
       { action: pendingTwoFactor ? "login.password_ok" : "login", entity: "user", entityId: user.id },
     );
   });
-  return { token, expiresAt, mustChangePassword: user.mustChangePassword, pendingTwoFactor };
+  return { userId: user.id, token, expiresAt, mustChangePassword: user.mustChangePassword, pendingTwoFactor };
 }
 
 export interface CurrentUser extends Actor {

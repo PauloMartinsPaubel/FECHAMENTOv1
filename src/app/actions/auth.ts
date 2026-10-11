@@ -1,14 +1,23 @@
 "use server";
 
+import { after } from "next/server";
 import { redirect } from "next/navigation";
-import { clearSessionCookie, clientIp, readToken, requireUser, setSessionCookie } from "@/server/auth/current";
+import { appBaseUrl, clearSessionCookie, clientIp, deviceKey, readToken, requireUser, setSessionCookie } from "@/server/auth/current";
 import { changeOwnPassword, loginWithPassword, logout } from "@/server/services/auth";
 import { headers } from "next/headers";
 import { ServiceError } from "@/server/errors";
 import { enforce } from "@/server/services/rate-limit";
 import { completeSecondStep } from "@/server/services/two-factor";
+import { handleLoginDevice } from "@/server/services/new-device";
 import { run, str } from "./util";
 import type { ActionState } from "./types";
+
+/** Login completo: registra o aparelho e, se for novo, avisa o dono da conta por e-mail (depois da resposta). */
+async function afterFullLogin(userId: string, ip: string | null) {
+  const login = { userId, deviceKey: await deviceKey(), userAgent: (await headers()).get("user-agent"), ip };
+  const url = await appBaseUrl();
+  after(() => handleLoginDevice(login, url));
+}
 
 export async function loginAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   let pending = false;
@@ -22,6 +31,7 @@ export async function loginAction(_prev: ActionState, fd: FormData): Promise<Act
     const r = await loginWithPassword(email, password, { ip, userAgent: h.get("user-agent") });
     await setSessionCookie(r.token, r.expiresAt);
     pending = r.pendingTwoFactor;
+    if (!pending) await afterFullLogin(r.userId, ip);
   });
   if (result?.ok) redirect(pending ? "/login/codigo" : "/");
   return result;
@@ -52,6 +62,7 @@ export async function secondStepAction(_prev: ActionState, fd: FormData): Promis
     await enforce("duas-etapas", ip);
     const r = await completeSecondStep(await readToken(), str(fd, "code"), { ip });
     await setSessionCookie(r.token, r.expiresAt);
+    await afterFullLogin(r.userId, ip);
   });
   if (result?.ok) redirect("/");
   return result;

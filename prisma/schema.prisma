@@ -168,6 +168,7 @@ model User {
   recoveryCodeHashes String[] @default([])
   authSessions AuthSession[]
   passwordResets PasswordReset[]
+  knownDevices   KnownDevice[]
   /// acesso a outras unidades além da principal (restaurantId)
   memberships  Membership[]
 
@@ -790,4 +791,21 @@ model RateLimitHit {
   @@index([bucket, keyHash, createdAt])
   @@index([createdAt])
   @@map("rate_limit_hits")
+}
+
+/// Navegadores em que a pessoa já entrou (pelo cookie do aparelho). Um novo gera aviso por e-mail.
+model KnownDevice {
+  id          String   @id @default(uuid())
+  userId      String
+  /// SHA-256 do identificador guardado no cookie do aparelho
+  keyHash     String
+  /// "Chrome no Windows", para o e-mail e a tela
+  label       String
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, keyHash])
+  @@map("known_devices")
 }
