@@ -1,3 +1,4 @@
+import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
 import { gunzipSync, gzipSync, strFromU8, strToU8 } from "fflate";
 import { prisma } from "../db";
 import { defaultFrom, emailProvider, sendMail } from "../email/provider";
@@ -25,7 +26,50 @@ export interface BackupFile {
   tables: Record<string, unknown[]>;
 }
 
-export async function createBackup(now = new Date()): Promise<{ file: Buffer; counts: Record<string, number> }> {
+// ---------------------------------------------------------------------------
+// Cifra opcional do arquivo (BACKUP_ENCRYPTION_KEY)
+// ---------------------------------------------------------------------------
+
+/** Começo de todo arquivo cifrado: identifica o formato antes de tentar abrir. */
+const MAGIC = Buffer.from("FCBK1");
+const MIN_KEY_LENGTH = 16;
+
+/** Chave para cifrar a cópia; sem ela a cópia sai só compactada, como antes. */
+export function backupKey(): string | null {
+  const k = process.env.BACKUP_ENCRYPTION_KEY;
+  return k && k.length >= MIN_KEY_LENGTH ? k : null;
+}
+
+export function isEncryptedBackup(file: Uint8Array): boolean {
+  return Buffer.from(file.subarray(0, MAGIC.length)).equals(MAGIC);
+}
+
+/** AES-256-GCM com chave derivada da frase por scrypt (sal novo a cada arquivo). */
+export function encryptBackup(gz: Uint8Array, passphrase: string): Buffer {
+  const salt = randomBytes(16);
+  const iv = randomBytes(12);
+  const key = scryptSync(passphrase, salt, 32);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const body = Buffer.concat([cipher.update(gz), cipher.final()]);
+  return Buffer.concat([MAGIC, salt, iv, cipher.getAuthTag(), body]);
+}
+
+export function decryptBackup(file: Uint8Array, passphrase: string): Buffer {
+  const buf = Buffer.from(file);
+  let at = MAGIC.length;
+  const salt = buf.subarray(at, (at += 16));
+  const iv = buf.subarray(at, (at += 12));
+  const tag = buf.subarray(at, (at += 16));
+  const decipher = createDecipheriv("aes-256-gcm", scryptSync(passphrase, salt, 32), iv);
+  decipher.setAuthTag(tag);
+  try {
+    return Buffer.concat([decipher.update(buf.subarray(at)), decipher.final()]);
+  } catch {
+    throw new Error("Não foi possível abrir a cópia: a chave não confere ou o arquivo está danificado.");
+  }
+}
+
+export async function createBackup(now = new Date(), passphrase: string | null = backupKey()): Promise<{ file: Buffer; counts: Record<string, number>; encrypted: boolean }> {
   const tables: Record<string, unknown[]> = {};
   const counts: Record<string, number> = {};
   for (const t of BACKUP_TABLES) {
@@ -35,10 +79,15 @@ export async function createBackup(now = new Date()): Promise<{ file: Buffer; co
     counts[t] = rows.length;
   }
   const data: BackupFile = { version: 1, createdAt: now.toISOString(), tables };
-  return { file: Buffer.from(gzipSync(strToU8(JSON.stringify(data)), { level: 9 })), counts };
+  const gz = gzipSync(strToU8(JSON.stringify(data)), { level: 9 });
+  return { file: passphrase ? encryptBackup(gz, passphrase) : Buffer.from(gz), counts, encrypted: Boolean(passphrase) };
 }
 
-export function readBackup(file: Uint8Array): BackupFile {
+export function readBackup(file: Uint8Array, passphrase: string | null = backupKey()): BackupFile {
+  if (isEncryptedBackup(file)) {
+    if (!passphrase) throw new Error("Esta cópia está cifrada. Informe a chave em BACKUP_ENCRYPTION_KEY para restaurar.");
+    file = decryptBackup(file, passphrase);
+  }
   const data = JSON.parse(strFromU8(gunzipSync(file))) as BackupFile;
   if (data?.version !== 1 || typeof data.tables !== "object") throw new Error("Arquivo de cópia inválido.");
   return data;
@@ -48,8 +97,8 @@ export function readBackup(file: Uint8Array): BackupFile {
  * Restaura uma cópia num banco VAZIO (com as tabelas já criadas pelas migrações).
  * Recusa se já houver restaurante, para nunca misturar com dados existentes.
  */
-export async function restoreBackup(file: Uint8Array): Promise<Record<string, number>> {
-  const data = readBackup(file);
+export async function restoreBackup(file: Uint8Array, passphrase: string | null = backupKey()): Promise<Record<string, number>> {
+  const data = readBackup(file, passphrase);
   const existing = await prisma.restaurant.count();
   if (existing > 0) throw new Error("O banco de destino já tem dados. A restauração só é feita em banco vazio.");
   const counts: Record<string, number> = {};
@@ -75,22 +124,29 @@ export async function runNightlyBackup(now = new Date(), send = sendMail) {
   await purgeOldHits(now).catch(() => 0);
   if (!to.length || emailProvider() === "none") return { sent: false, reason: "Sem OPS_ALERT_EMAIL ou envio de e-mail configurado." };
   try {
-    const { file, counts } = await createBackup(now);
+    const { file, counts, encrypted } = await createBackup(now);
     const day = now.toISOString().slice(0, 10);
     if (file.length > MAX_ATTACHMENT_BYTES) {
       await reportError({ message: `Cópia de segurança grande demais para e-mail (${(file.length / 1048576).toFixed(1)} MB). É hora de guardar as cópias em outro lugar.`, kind: "backup" }, now, send);
       return { sent: false, reason: "grande demais", bytes: file.length };
     }
     const lines = Object.entries(counts).map(([t, n]) => `${t}: ${n}`);
+    const note = encrypted
+      ? "O anexo está cifrado. Para restaurar é preciso a chave BACKUP_ENCRYPTION_KEY, guardada fora do e-mail."
+      : "Guarde este e-mail. O anexo contém dados de clientes e senhas cifradas: não repasse. Para cifrar o anexo, configure BACKUP_ENCRYPTION_KEY no servidor.";
     await send({
       from: defaultFrom(null),
       to,
       subject: `[Fechamento de Caixa] Cópia de segurança ${day}`,
-      text: `Cópia de segurança de todos os restaurantes, gerada em ${now.toISOString()}.\nGuarde este e-mail. O anexo contém dados de clientes e senhas cifradas: não repasse.\n\nRegistros por tabela:\n${lines.join("\n")}`,
-      html: `<p>Cópia de segurança de todos os restaurantes, gerada em ${now.toISOString()}.</p><p>Guarde este e-mail. O anexo contém dados de clientes e senhas cifradas: não repasse.</p><pre>${lines.join("\n")}</pre>`,
-      attachments: [{ filename: `fechamento-backup-${day}.json.gz`, content: file, contentType: "application/gzip" }],
+      text: `Cópia de segurança de todos os restaurantes, gerada em ${now.toISOString()}.\n${note}\n\nRegistros por tabela:\n${lines.join("\n")}`,
+      html: `<p>Cópia de segurança de todos os restaurantes, gerada em ${now.toISOString()}.</p><p>${note}</p><pre>${lines.join("\n")}</pre>`,
+      attachments: [
+        encrypted
+          ? { filename: `fechamento-backup-${day}.json.gz.cifrado`, content: file, contentType: "application/octet-stream" }
+          : { filename: `fechamento-backup-${day}.json.gz`, content: file, contentType: "application/gzip" },
+      ],
     });
-    return { sent: true, bytes: file.length, counts };
+    return { sent: true, bytes: file.length, counts, encrypted };
   } catch (err) {
     const e = err as Error;
     await reportError({ message: `Falha na cópia de segurança: ${e?.message ?? String(err)}`, stack: e?.stack, kind: "backup" }, now, send);

@@ -62,3 +62,13 @@ Em `/cadastro` (link na tela de login), um restaurante novo cria a própria cont
 Restaurante novo começa com 14 dias de teste grátis. O administrador assina em **Assinatura** (CPF ou CNPJ e e-mail das faturas); o Asaas cria a assinatura mensal e cada fatura deixa pagar por PIX, boleto ou cartão. Mensalidade vencida: aviso por 7 dias e, depois, o restaurante fica só leitura (não abre caixa novo; relatórios, histórico e caixa já aberto continuam). Pagou, libera na hora. O restaurante da instalação é isento.
 
 Variáveis na Vercel: `ASAAS_API_KEY` (chave da API), `ASAAS_ENV=production` (sem ela usa o sandbox de testes), `BILLING_PRICE_CENTS` (mensalidade em centavos, ex.: `14990`) e `ASAAS_WEBHOOK_TOKEN`. No painel do Asaas, configure o webhook para `https://SEU-DOMINIO/api/asaas/webhook`, com o mesmo token e os eventos de cobrança.
+
+## Segurança da conta
+
+Em **Minha conta** (clique no nome, no topo) cada pessoa troca a senha, liga a verificação em duas etapas (código de um aplicativo autenticador, com 10 códigos de recuperação) e vê ou encerra os aparelhos conectados. Em Configurações, o administrador pode exigir a verificação de administradores e gerentes; quem ainda não ligou é levado para isso no próximo acesso. Quando alguém entra num navegador que nunca usou, o dono da conta recebe um e-mail com aparelho, horário e endereço.
+
+A variável `TOTP_ENCRYPTION_KEY` (texto aleatório com 16 caracteres ou mais) cifra os segredos da verificação no banco. Não troque depois de configurada: quem já ligou a verificação teria que ligar de novo.
+
+## Cópia de segurança
+
+Toda madrugada a Vercel chama `/api/cron/backup`, que manda para `OPS_ALERT_EMAIL` um arquivo com os dados de todos os restaurantes. Com a variável `BACKUP_ENCRYPTION_KEY` (frase com 16 caracteres ou mais), o anexo sai cifrado (AES-256-GCM) e só abre com essa frase; guarde-a num gerenciador de senhas, fora do e-mail, porque sem ela a cópia não serve. Para restaurar num banco vazio: `npm run db:deploy` no banco novo e depois `DATABASE_URL=... BACKUP_ENCRYPTION_KEY=... npx tsx scripts/restaurar-backup.ts arquivo`.

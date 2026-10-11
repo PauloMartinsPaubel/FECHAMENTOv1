@@ -1,6 +1,7 @@
 /**
- * Restaura uma cópia de segurança (.json.gz recebida por e-mail) num banco VAZIO.
+ * Restaura uma cópia de segurança (.json.gz ou .json.gz.cifrado recebida por e-mail) num banco VAZIO.
  * Uso: DATABASE_URL=... npx tsx scripts/restaurar-backup.ts caminho/fechamento-backup-AAAA-MM-DD.json.gz
+ * Cópia cifrada: informe também a chave em BACKUP_ENCRYPTION_KEY=...
  * Antes: crie as tabelas com "npm run db:deploy" no banco novo.
  */
 import { readFileSync } from "node:fs";
