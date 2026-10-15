@@ -102,6 +102,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <p className="mb-3 text-sm text-stone-600">
             Com a opção ligada, administradores e gerentes só usam o sistema depois de ligar a verificação em duas etapas (código do aplicativo no celular, além da senha).
             Quem ainda não ligou é levado direto para isso no próximo acesso. Operadores não são afetados.
+            Para ligar a regra, ligue antes a sua em <a className="link" href="/conta">Minha conta</a>.
           </p>
           <TwoFactorPolicyForm required={policy.required} />
           {policy.total > 0 ? (

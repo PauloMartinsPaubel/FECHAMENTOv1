@@ -42,8 +42,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </Link>
           <div className="flex items-center gap-3 text-sm">
             {units.length > 1 && !blocked ? <UnitSwitcher units={units} current={user.restaurantId} /> : null}
-            <Link href="/conta" className="text-stone-600 hover:underline" title="Minha conta: senha, verificação em duas etapas e aparelhos conectados">
+            <span className="hidden text-stone-600 sm:inline">
               {user.name} <span className="text-stone-400">({ROLE_LABEL[user.role]})</span>
+            </span>
+            <Link href="/conta" className="btn-secondary btn-sm whitespace-nowrap" title="Senha, verificação em duas etapas e aparelhos conectados">
+              Minha conta
             </Link>
             <form action={logoutAction}>
               <button type="submit" className="btn-secondary btn-sm">Sair</button>
