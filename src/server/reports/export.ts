@@ -186,6 +186,7 @@ export async function buildExport(actor: Actor, params: ExportParams): Promise<{
         break;
       }
       case "vendas": {
+        headers = [...COMMON, "Marca"];
         for (const s of sessions) {
           const b = base(s);
           for (const m of s.movements.filter((x) => x.type === "VENDA")) {
@@ -195,6 +196,7 @@ export async function buildExport(actor: Actor, params: ExportParams): Promise<{
               "Venda", $(m.amountCents), null, null,
               [m.orderNumber ? `Pedido ${m.orderNumber}` : "", `lançado por ${m.createdBy.name}`, m.description ?? ""].filter(Boolean).join("; "),
               MOVEMENT_STATUS_LABEL[m.status],
+              m.store?.name ?? "",
             ]);
           }
         }
@@ -211,12 +213,12 @@ export async function buildExport(actor: Actor, params: ExportParams): Promise<{
         rows = conferenceRows(sessions, null, true);
         break;
       case "movimentacoes": {
-        headers = [...COMMON, "Impacto no faturamento", "Impacto no saldo físico"];
+        headers = [...COMMON, "Impacto no faturamento", "Impacto no saldo físico", "Marca"];
         for (const s of sessions) {
           const b = base(s);
           rows.push([
             `${s.session.id}:fundo`, b.date, b.shift, b.register, b.responsible, "", "Dinheiro", MOVEMENT_TYPE_LABEL.FUNDO_ABERTURA,
-            $(s.session.openingFloatCents), null, null, FLOAT_MODE_LABEL[s.session.floatMode], "Ativo", $(0), $(s.session.openingFloatCents),
+            $(s.session.openingFloatCents), null, null, FLOAT_MODE_LABEL[s.session.floatMode], "Ativo", $(0), $(s.session.openingFloatCents), "",
           ]);
           for (const m of s.movements) {
             rows.push([
@@ -227,12 +229,13 @@ export async function buildExport(actor: Actor, params: ExportParams): Promise<{
               MOVEMENT_STATUS_LABEL[m.status],
               $(m.status === "ACTIVE" ? m.revenueEffect * m.amountCents : 0),
               $(m.status === "ACTIVE" ? m.cashEffect * m.amountCents : 0),
+              m.store?.name ?? "",
             ]);
           }
           for (const c of s.cancellations) {
             rows.push([
               c.id, b.date, b.shift, b.register, b.responsible, c.channel.name, c.paymentMethod?.name ?? "", MOVEMENT_TYPE_LABEL.CANCELAMENTO,
-              $(c.amountCents), null, null, `Pedido ${c.orderNumber}; ${c.reason}`, c.movementId ? "Venda cancelada" : "Informativo", $(0), $(0),
+              $(c.amountCents), null, null, `Pedido ${c.orderNumber}; ${c.reason}`, c.movementId ? "Venda cancelada" : "Informativo", $(0), $(0), "",
             ]);
           }
         }

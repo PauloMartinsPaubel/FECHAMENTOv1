@@ -3,6 +3,7 @@
 import { ActionForm } from "@/components/action-form";
 import { MoneyInput } from "@/components/money-input";
 import { addGridAction } from "@/app/actions/cash";
+import { StorePicker, type StoreOption } from "@/components/store-picker";
 
 export type GridColumn = { methodId: string; brandId: string | null; label: string };
 
@@ -12,14 +13,18 @@ export function GridForm({
   channels,
   columns,
   correction,
+  stores = [],
 }: {
   sessionId: string;
   channels: { id: string; name: string }[];
   columns: GridColumn[];
   correction: boolean;
+  stores?: StoreOption[];
 }) {
   return (
     <ActionForm action={addGridAction} idempotent resetOnSuccess hidden={{ sessionId }} className="space-y-3">
+      {stores.length >= 2 ? <p className="text-sm text-stone-600">Todos os valores desta grade vão para a marca escolhida. Para a outra marca, lance uma segunda grade.</p> : null}
+      <StorePicker stores={stores} idPrefix="grid-store" />
       <div className="overflow-x-auto rounded-lg border border-stone-200">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-stone-50">

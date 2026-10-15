@@ -19,6 +19,7 @@ const SHEETS: { file: string; title: string; sql: string }[] = [
   { file: "canais", title: "Canais de venda", sql: `SELECT * FROM sales_channels WHERE "restaurantId" = $1` },
   { file: "formas_de_pagamento", title: "Formas de pagamento", sql: `SELECT * FROM payment_methods WHERE "restaurantId" = $1` },
   { file: "bandeiras", title: "Bandeiras de ticket", sql: `SELECT * FROM ticket_brands WHERE "restaurantId" = $1` },
+  { file: "marcas", title: "Marcas no mesmo caixa", sql: `SELECT * FROM stores WHERE "restaurantId" = $1 ORDER BY "sortOrder"` },
   { file: "caixas_abertos_e_fechados", title: "Caixas por turno", sql: `SELECT * FROM cash_sessions WHERE "restaurantId" = $1 ORDER BY "businessDate", "createdAt"` },
   { file: "movimentacoes", title: "Vendas e movimentações", sql: `SELECT * FROM cash_movements WHERE "restaurantId" = $1 ORDER BY "createdAt"` },
   { file: "pedidos_cancelados", title: "Pedidos cancelados", sql: `SELECT * FROM cancellations WHERE "restaurantId" = $1 ORDER BY "createdAt"` },

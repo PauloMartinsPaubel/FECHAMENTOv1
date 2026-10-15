@@ -31,8 +31,37 @@ describe("atalhos do lançamento rápido", () => {
     ]);
     expect(r[3]).toMatchObject({ paymentMethodId: "tick", ticketBrandId: "vr" });
     expect(r.map((s) => s.uses)).toEqual([40, 12, 12, 3, 0, 0]);
-    const many = Array.from({ length: 10 }, (_, i) => ({ channelId: "balcao", paymentMethodId: "din", ticketBrandId: null, count: i + 1 }));
+    const combos = ["balcao", "ifood"].flatMap((ch) => ["din", "pix", "cred", "deb", "onl"].map((pm) => [ch, pm] as const));
+    const many = combos.map(([channelId, paymentMethodId], i) => ({ channelId, paymentMethodId, ticketBrandId: null, count: i + 1 }));
     expect(rankSaleShortcuts(many, catalog, 6)).toHaveLength(6);
+  });
+
+  it("a mesma combinação em grupos diferentes (com e sem marca) vira um atalho só", () => {
+    const r = rankSaleShortcuts(
+      [
+        { channelId: "balcao", paymentMethodId: "pix", ticketBrandId: null, storeId: null, count: 5 },
+        { channelId: "balcao", paymentMethodId: "pix", ticketBrandId: null, storeId: "feijoada", count: 7 },
+      ],
+      { ...catalog, stores: [{ id: "feijoada", name: "A Feijoada" }] },
+    );
+    expect(r[0]).toMatchObject({ label: "Balcão · PIX", uses: 12, storeId: null });
+  });
+
+  it("com duas marcas, cada atalho leva a marca e vendas antigas sem marca ficam de fora", () => {
+    const stores = [{ id: "feijoada", name: "A Feijoada" }, { id: "prato", name: "Prato e Folha" }];
+    const r = rankSaleShortcuts(
+      [
+        { channelId: "ifood", paymentMethodId: "onl", ticketBrandId: null, storeId: "prato", count: 9 },
+        { channelId: "ifood", paymentMethodId: "onl", ticketBrandId: null, storeId: "feijoada", count: 20 },
+        { channelId: "balcao", paymentMethodId: "pix", ticketBrandId: null, storeId: null, count: 99 },
+      ],
+      { ...catalog, stores },
+      2,
+    );
+    expect(r.map((s) => [s.label, s.storeId])).toEqual([
+      ["A Feijoada · iFood · Pagamento online", "feijoada"],
+      ["Prato e Folha · iFood · Pagamento online", "prato"],
+    ]);
   });
 
   it("ignora canal ou forma desativados e ticket sem bandeira", () => {

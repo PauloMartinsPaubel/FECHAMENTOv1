@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { formatTimeBR } from "@/lib/dates";
 import { formatBRL } from "@/lib/finance";
 import { MOVEMENT_TYPE_LABEL } from "@/lib/reports/labels";
+import { describeStores } from "@/lib/reports/stores";
 import { Alert, Badge, Empty, Money, Stat } from "@/components/ui";
 import { getSessionPage } from "@/server/session-page";
 import { saleShortcuts } from "@/server/services/shortcuts";
@@ -19,6 +20,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
     channels: catalogRows.channels.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name })),
     methods: catalogRows.methods.filter((m) => m.active).map((m) => ({ id: m.id, name: m.name, kind: m.kind })),
     brands: catalogRows.brands.filter((b) => b.active).map((b) => ({ id: b.id, name: b.name })),
+    stores: catalogRows.stores.filter((st) => st.active).map((st) => ({ id: st.id, name: st.name })),
   };
   const correction = editMode === "correction";
   const shortcuts = editMode ? await saleShortcuts(session.restaurantId, catalog).catch(() => []) : [];
@@ -49,7 +51,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         </section>
       ) : null}
 
-      <SummaryStrip summary={ev.summary} />
+      <SummaryStrip summary={ev.summary} stores={describeStores(ev.summary.byStore, catalogRows.stores, catalogRows.channels)} />
 
       {editMode ? (
         <>
@@ -100,6 +102,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
                     </div>
                     <div className="mt-0.5 text-sm text-stone-600">
                       {[
+                        m.store?.name,
                         m.channel?.name,
                         m.ticketBrand ? `${m.paymentMethod?.name} / ${m.ticketBrand.name}` : m.paymentMethod?.name,
                         m.orderNumber ? `pedido ${m.orderNumber}` : null,
@@ -134,6 +137,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
                       channelId: m.channelId,
                       paymentMethodId: m.paymentMethodId,
                       ticketBrandId: m.ticketBrandId,
+                      storeId: m.storeId,
                       orderNumber: m.orderNumber,
                       description: m.description,
                       isAdjustment: m.type === "AJUSTE",

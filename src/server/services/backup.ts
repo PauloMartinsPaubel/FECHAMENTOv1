@@ -11,7 +11,7 @@ import { purgeOldHits } from "./rate-limit";
  * e o registro de tentativas: não fazem falta numa restauração.
  */
 export const BACKUP_TABLES = [
-  "roles", "restaurants", "settings", "cash_registers", "shifts", "sales_channels", "payment_methods", "ticket_brands",
+  "roles", "restaurants", "settings", "cash_registers", "shifts", "sales_channels", "payment_methods", "ticket_brands", "stores",
   "users", "memberships", "cash_sessions", "cash_movements", "cancellations", "adjustments", "closing_conferences",
   "cash_closings", "closing_details", "email_logs", "audit_logs", "platform_integrations", "platform_orders",
   "platform_events", "billing_payments",

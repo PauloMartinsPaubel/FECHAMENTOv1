@@ -6,6 +6,14 @@ import type {
   PaymentKind,
 } from "@/lib/finance";
 
+/** Faturamento de uma marca (restaurante) que divide o caixa com outras. */
+export interface StoreBreakdownLine {
+  name: string;
+  revenueCents: number;
+  byKind: { kind: PaymentKind; label: string; netCents: number }[];
+  byChannel: { channelName: string; netCents: number }[];
+}
+
 /** Foto completa de um turno. É o que o fechamento grava e o que todo relatório lê. JSON puro. */
 export interface ShiftReportData {
   version: 1;
@@ -82,6 +90,8 @@ export interface ShiftReportData {
     cells: { methodName: string; kind: PaymentKind; brandName: string | null; netCents: number }[];
   }[];
   ticketBrands: { name: string; netCents: number }[];
+  /** faturamento separado por marca; ausente em fechamentos antigos e vazio quando a unidade tem um restaurante só */
+  byStore?: StoreBreakdownLine[];
   cancellations: {
     orderNumber: string;
     channelName: string;

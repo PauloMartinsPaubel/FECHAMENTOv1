@@ -98,6 +98,7 @@ model Restaurant {
   settings       Setting?
   billingPayments BillingPayment[]
   memberships     Membership[]
+  stores          Store[]
 
   @@map("restaurants")
 }
@@ -350,6 +351,8 @@ model CashMovement {
   channelId       String?
   paymentMethodId String?
   ticketBrandId   String?
+  /// marca (restaurante) da venda quando a unidade tem mais de uma no mesmo caixa
+  storeId         String?
   orderNumber     String?
   description     String?
   employeeName    String?
@@ -368,6 +371,7 @@ model CashMovement {
   channel       SalesChannel?  @relation(fields: [channelId], references: [id])
   paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
   ticketBrand   TicketBrand?   @relation(fields: [ticketBrandId], references: [id])
+  store         Store?         @relation(fields: [storeId], references: [id])
   createdBy     User           @relation("MovementCreatedBy", fields: [createdById], references: [id])
   voidedBy      User?          @relation("MovementVoidedBy", fields: [voidedById], references: [id])
   cancellation  Cancellation?
@@ -808,4 +812,20 @@ model KnownDevice {
 
   @@unique([userId, keyHash])
   @@map("known_devices")
+}
+
+/// Marca que divide o caixa com outra na mesma unidade (ex.: A Feijoada e Prato e Folha): mesma gaveta,
+/// mesmas maquininhas e uma conferência só; o faturamento sai separado por marca nos relatórios.
+model Store {
+  id           String  @id @default(uuid())
+  restaurantId String
+  name         String
+  active       Boolean @default(true)
+  sortOrder    Int     @default(0)
+
+  restaurant Restaurant     @relation(fields: [restaurantId], references: [id])
+  movements  CashMovement[]
+
+  @@unique([restaurantId, name])
+  @@map("stores")
 }

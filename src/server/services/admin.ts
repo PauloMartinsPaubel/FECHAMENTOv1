@@ -179,6 +179,26 @@ export async function saveTicketBrand(actor: Actor, input: { id?: string; name: 
   }
 }
 
+/** Marca que divide o caixa (ex.: A Feijoada e Prato e Folha). Desativar não mexe nas vendas já lançadas. */
+export async function saveStore(actor: Actor, input: { id?: string; name: string; active: boolean; sortOrder?: number }) {
+  assertCan(actor, "catalog.manage");
+  const name = cleanName(input.name, "O nome da marca");
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const before = input.id ? await tx.store.findFirst({ where: { id: input.id, restaurantId: actor.restaurantId } }) : null;
+      if (input.id && !before) throw new ServiceError("Marca não encontrada.", "NOT_FOUND");
+      const data = { name, active: input.active, sortOrder: input.sortOrder ?? before?.sortOrder ?? 99 };
+      const saved = before
+        ? await tx.store.update({ where: { id: before.id }, data })
+        : await tx.store.create({ data: { ...data, restaurantId: actor.restaurantId } });
+      await audit(tx, actor, { action: before ? "catalog.store.update" : "catalog.store.create", entity: "store", entityId: saved.id, oldValue: before, newValue: saved });
+      return saved;
+    });
+  } catch (e) {
+    return uniqueViolation(e, "Já existe uma marca com este nome.");
+  }
+}
+
 export async function saveRegister(actor: Actor, input: { id?: string; name: string; active: boolean }) {
   assertCan(actor, "catalog.manage");
   const name = cleanName(input.name, "O nome do caixa");

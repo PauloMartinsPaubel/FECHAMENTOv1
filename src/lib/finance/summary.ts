@@ -8,10 +8,38 @@ import {
   PaymentKind,
   SessionInput,
   SessionSummary,
+  StoreTotals,
 } from "./types";
 
 function emptyKindTotals(): KindTotals {
   return { grossCents: 0, refundsCents: 0, adjustmentCents: 0, netCents: 0 };
+}
+
+function emptyKindCents(): Record<PaymentKind, number> {
+  const out = {} as Record<PaymentKind, number>;
+  for (const k of PAYMENT_KINDS) out[k] = 0;
+  return out;
+}
+
+/** Junta o faturamento por marca de vários caixas (dia, período). */
+export function mergeStoreTotals(lists: StoreTotals[][]): StoreTotals[] {
+  const out = new Map<string, { storeId: string | null; netCents: number; byKind: Record<PaymentKind, number>; channels: Map<string, number> }>();
+  for (const list of lists) {
+    for (const st of list) {
+      const key = st.storeId ?? "";
+      const acc = out.get(key) ?? { storeId: st.storeId, netCents: 0, byKind: emptyKindCents(), channels: new Map<string, number>() };
+      acc.netCents += st.netCents;
+      for (const k of PAYMENT_KINDS) acc.byKind[k] += st.byKind[k];
+      for (const c of st.byChannel) acc.channels.set(c.channelId, (acc.channels.get(c.channelId) ?? 0) + c.netCents);
+      out.set(key, acc);
+    }
+  }
+  return [...out.values()].map((st) => ({
+    storeId: st.storeId,
+    netCents: st.netCents,
+    byKind: st.byKind,
+    byChannel: [...st.channels.entries()].map(([channelId, netCents]) => ({ channelId, netCents })),
+  }));
 }
 
 export function emptyByKind(): Record<PaymentKind, KindTotals> {
@@ -58,6 +86,8 @@ export function summarizeSession(input: SessionInput): SessionSummary {
   const matrix = new Map<string, MatrixCell>();
   const channelNet = new Map<string, number>();
   const brandNet = new Map<string, number>();
+  const stores = new Map<string, { storeId: string | null; netCents: number; byKind: Record<PaymentKind, number>; channels: Map<string, number> }>();
+  let anyStore = false;
 
   const active: MovementRow[] = input.movements.filter((m) => m.status === "ACTIVE");
   for (const m of active) {
@@ -119,6 +149,15 @@ export function summarizeSession(input: SessionInput): SessionSummary {
       if (m.ticketBrandId) {
         brandNet.set(m.ticketBrandId, (brandNet.get(m.ticketBrandId) ?? 0) + signedRevenue);
       }
+
+      const storeId = m.storeId ?? null;
+      if (storeId) anyStore = true;
+      const key = storeId ?? "";
+      const st = stores.get(key) ?? { storeId, netCents: 0, byKind: emptyKindCents(), channels: new Map<string, number>() };
+      st.netCents += signedRevenue;
+      st.byKind[m.paymentKind] += signedRevenue;
+      if (m.channelId) st.channels.set(m.channelId, (st.channels.get(m.channelId) ?? 0) + signedRevenue);
+      stores.set(key, st);
     }
   }
 
@@ -136,6 +175,17 @@ export function summarizeSession(input: SessionInput): SessionSummary {
   if (revenue !== grossSales - refunds + revenueAdjustment) {
     issues.push("Faturamento diferente de vendas - estornos +/- ajustes.");
   }
+  // sem nenhuma marca nos lançamentos, a separação não existe (unidade com um restaurante só)
+  const byStore: StoreTotals[] = anyStore
+    ? [...stores.values()].map((st) => ({
+        storeId: st.storeId,
+        netCents: st.netCents,
+        byKind: st.byKind,
+        byChannel: [...st.channels.entries()].map(([channelId, netCents]) => ({ channelId, netCents })),
+      }))
+    : [];
+  const storeSum = byStore.reduce((acc, st) => acc + st.netCents, 0);
+  if (anyStore && storeSum !== revenue) issues.push(`Soma por marca (${storeSum}) diferente do faturamento (${revenue}).`);
 
   const credit = byKind.CREDIT.netCents;
   const debit = byKind.DEBIT.netCents;
@@ -158,6 +208,7 @@ export function summarizeSession(input: SessionInput): SessionSummary {
     matrix: [...matrix.values()],
     byChannel: [...channelNet.entries()].map(([channelId, netCents]) => ({ channelId, netCents })),
     byTicketBrand: [...brandNet.entries()].map(([ticketBrandId, netCents]) => ({ ticketBrandId, netCents })),
+    byStore,
     movementCount,
     integrityIssues: issues,
   };

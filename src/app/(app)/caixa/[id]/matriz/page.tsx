@@ -89,7 +89,13 @@ export default async function MatrixPage({ params }: { params: Promise<{ id: str
       {editMode ? (
         <section className="card">
           <h2 className="card-title">Lançar totais por canal e forma</h2>
-          <GridForm sessionId={session.id} channels={channels.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name }))} columns={columns} correction={editMode === "correction"} />
+          <GridForm
+            sessionId={session.id}
+            channels={channels.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name }))}
+            columns={columns}
+            correction={editMode === "correction"}
+            stores={cat.stores.filter((st) => st.active).map((st) => ({ id: st.id, name: st.name }))}
+          />
         </section>
       ) : null}
     </div>

@@ -96,6 +96,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         {catalog.brands.map((b) => <CatalogRow key={b.id} kind="brand" item={{ id: b.id, name: b.name, active: b.active }} />)}
       </Catalog>
 
+      <Catalog
+        title="Marcas no mesmo caixa"
+        kind="store"
+        help="Para quem tem mais de um restaurante dividindo a mesma gaveta e as mesmas maquininhas, como A Feijoada e Prato e Folha. Com duas marcas ativas, cada venda pede a marca, a conferência continua uma só e a nota de fechamento mostra o faturamento de cada uma. Com uma marca só (ou nenhuma), nada muda."
+      >
+        {catalog.stores.map((st) => <CatalogRow key={st.id} kind="store" item={{ id: st.id, name: st.name, active: st.active }} />)}
+      </Catalog>
+
       {policy.available ? (
         <section className="card">
           <h2 className="card-title">Segurança da equipe</h2>
@@ -150,7 +158,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   );
 }
 
-function Catalog({ title, kind, help, children }: { title: string; kind: "register" | "shift" | "channel" | "method" | "brand"; help: string; children: React.ReactNode }) {
+function Catalog({ title, kind, help, children }: { title: string; kind: "register" | "shift" | "channel" | "method" | "brand" | "store"; help: string; children: React.ReactNode }) {
   return (
     <section className="card">
       <h2 className="card-title">{title}</h2>

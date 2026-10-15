@@ -15,10 +15,12 @@ import {
   SessionEvaluation,
   MovementRow,
   CancellationRow,
+  mergeStoreTotals,
 } from "@/lib/finance";
 import type { DayReportData } from "@/lib/reports/html";
 import { statusText } from "@/lib/reports/labels";
-import type { CorrectionLine } from "@/lib/reports/types";
+import { describeStores } from "@/lib/reports/stores";
+import type { CorrectionLine, StoreBreakdownLine } from "@/lib/reports/types";
 import { Actor } from "../actor";
 import { Db, prisma } from "../db";
 import { ServiceError } from "../errors";
@@ -48,6 +50,7 @@ const movementInclude = {
   paymentMethod: { select: { kind: true, name: true } },
   channel: { select: { name: true } },
   ticketBrand: { select: { name: true } },
+  store: { select: { name: true } },
   createdBy: { select: { name: true } },
 } satisfies Prisma.CashMovementInclude;
 
@@ -158,6 +161,7 @@ export function toMovementRow(m: MovementWithNames): MovementRow {
     paymentMethodId: m.paymentMethodId,
     paymentKind: (m.paymentMethod?.kind as PaymentKind | undefined) ?? null,
     ticketBrandId: m.ticketBrandId,
+    storeId: m.storeId,
     orderNumber: m.orderNumber,
     description: m.description,
   };
@@ -179,7 +183,7 @@ export function toCancellationRow(c: CancellationWithNames): CancellationRow {
 // ---------------------------------------------------------------------------
 
 export async function buildDayReport(actor: Actor, businessDate: string): Promise<DayReportData> {
-  const { sessions } = await loadEvaluatedSessions(prisma, actor, { from: businessDate, to: businessDate });
+  const { sessions, catalogRows } = await loadEvaluatedSessions(prisma, actor, { from: businessDate, to: businessDate });
   const restaurant = await prisma.restaurant.findUniqueOrThrow({ where: { id: actor.restaurantId } });
   const consolidation: DayConsolidation = consolidateDay(
     sessions.map((s) => ({
@@ -212,6 +216,7 @@ export async function buildDayReport(actor: Actor, businessDate: string): Promis
       closingStatusText: statusText(s.evaluation.divergence.status, s.evaluation.divergence.netCents, s.evaluation.divergence.absCents),
     })),
     consolidation,
+    byStore: describeStores(mergeStoreTotals(sessions.map((s) => s.evaluation.summary.byStore)), catalogRows.stores, catalogRows.channels),
   };
 }
 
@@ -250,6 +255,8 @@ export interface PeriodReport {
   byChannel: { channelId: string; name: string; isPlatform: boolean; netCents: number; byKind: Record<PaymentKind, number> }[];
   byMethod: { key: string; label: string; kind: PaymentKind; grossCents: number; refundsCents: number; netCents: number }[];
   byKind: { kind: PaymentKind; label: string; netCents: number }[];
+  /** faturamento por marca; vazio com um restaurante só ou com filtro de canal/forma */
+  byStore: StoreBreakdownLine[];
   divergences: {
     sessionId: string;
     date: string;
@@ -388,6 +395,7 @@ export async function buildPeriodReport(actor: Actor, filters: PeriodFilters): P
     byChannel: [...channelMap.values()].sort((a, b) => b.netCents - a.netCents),
     byMethod: [...methodMap.values()].sort((a, b) => b.netCents - a.netCents),
     byKind: PAYMENT_KINDS.map((k) => ({ kind: k, label: KIND_LABEL[k], netCents: kindMap.get(k) ?? 0 })),
+    byStore: scoped ? [] : describeStores(mergeStoreTotals(sessions.map((s) => s.evaluation.summary.byStore)), catalogRows.stores, catalogRows.channels),
     divergences,
   };
 }

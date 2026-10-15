@@ -67,6 +67,7 @@ export async function addSaleAction(_p: ActionState, fd: FormData): Promise<Acti
       channelId: optStr(fd, "channelId"),
       paymentMethodId: optStr(fd, "paymentMethodId"),
       ticketBrandId: optStr(fd, "ticketBrandId"),
+      storeId: optStr(fd, "storeId"),
       ...movementBase(fd),
     });
     refresh(sessionId);
@@ -87,6 +88,7 @@ export async function addMovementAction(_p: ActionState, fd: FormData): Promise<
       channelId: optStr(fd, "channelId"),
       paymentMethodId: optStr(fd, "paymentMethodId"),
       ticketBrandId: optStr(fd, "ticketBrandId"),
+      storeId: optStr(fd, "storeId"),
       ...movementBase(fd),
     };
     if (type === "AJUSTE") {
@@ -108,6 +110,8 @@ export async function addGridAction(_p: ActionState, fd: FormData): Promise<Acti
     const actor = await actorFromSession();
     const sessionId = str(fd, "sessionId");
     const reason = optStr(fd, "reason");
+    // a grade inteira é de uma marca só (escolhida no topo dela)
+    const storeId = optStr(fd, "storeId");
     const items: MovementInput[] = [];
     for (const [name, value] of fd.entries()) {
       if (!name.startsWith("cell:") || typeof value !== "string" || value.trim() === "") continue;
@@ -121,6 +125,7 @@ export async function addGridAction(_p: ActionState, fd: FormData): Promise<Acti
         channelId,
         paymentMethodId: methodId,
         ticketBrandId: brandId && brandId !== "-" ? brandId : null,
+        storeId,
         description: "Lançamento em grade",
         reason,
       });
@@ -147,6 +152,7 @@ export async function updateMovementAction(_p: ActionState, fd: FormData): Promi
         channelId: fd.has("channelId") ? optStr(fd, "channelId") : undefined,
         paymentMethodId: fd.has("paymentMethodId") ? optStr(fd, "paymentMethodId") : undefined,
         ticketBrandId: fd.has("paymentMethodId") ? optStr(fd, "ticketBrandId") : undefined,
+        storeId: fd.has("storeId") ? optStr(fd, "storeId") : undefined,
         orderNumber: optStr(fd, "orderNumber"),
         description: optStr(fd, "description"),
       },

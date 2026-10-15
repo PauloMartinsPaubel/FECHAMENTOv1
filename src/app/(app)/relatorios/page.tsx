@@ -119,6 +119,30 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <Breakdown title="Por funcionário" rows={report.byEmployee} />
           <Breakdown title="Por caixa" rows={report.byRegister} />
 
+          {report.byStore.length > 0 ? (
+            <section className="card">
+              <h2 className="card-title">Por marca</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead><tr className="border-b border-stone-300"><th className="th">Marca</th>{PAYMENT_KINDS.map((k) => <th key={k} className="th text-right">{KIND_LABEL[k]}</th>)}<th className="th text-right">Faturamento</th></tr></thead>
+                  <tbody className="divide-y divide-stone-100">
+                    {report.byStore.map((st) => (
+                      <tr key={st.name}>
+                        <th scope="row" className="td text-left font-medium">{st.name}</th>
+                        {PAYMENT_KINDS.map((k) => {
+                          const v = st.byKind.find((x) => x.kind === k)?.netCents ?? 0;
+                          return <td key={k} className="td num">{v ? formatBRL(v) : <span className="text-stone-300">-</span>}</td>;
+                        })}
+                        <td className="td num font-semibold">{formatBRL(st.revenueCents)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot><tr className="border-t-2 border-stone-400 font-bold"><th scope="row" className="td text-left">Total</th>{report.byKind.map((k) => <td key={k.kind} className="td num">{formatBRL(k.netCents)}</td>)}<td className="td num">{formatBRL(t.revenueCents)}</td></tr></tfoot>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
           <section className="card">
             <h2 className="card-title">Por plataforma / canal e forma de pagamento</h2>
             {report.byChannel.length === 0 ? <Empty>Sem vendas.</Empty> : (

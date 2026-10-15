@@ -1,8 +1,8 @@
-import { formatBRL, formatSigned, KIND_LABEL } from "@/lib/finance";
+import { formatBRL, formatSigned, KIND_LABEL, PAYMENT_KINDS } from "@/lib/finance";
 import type { DayConsolidation, Headline } from "@/lib/finance";
 import { formatDateBR, formatDateTimeBR, weekdayBR } from "@/lib/dates";
 import { FLOAT_MODE_LABEL, MOVEMENT_TYPE_LABEL, SESSION_STATUS_LABEL, statusText } from "./labels";
-import type { CorrectionLine, ShiftReportData } from "./types";
+import type { CorrectionLine, ShiftReportData, StoreBreakdownLine } from "./types";
 
 /** Escapa tudo que veio de digitação. Nenhum texto do usuário entra no HTML sem passar por aqui. */
 export function esc(value: unknown): string {
@@ -50,6 +50,28 @@ const diffCell = (c: number | null) =>
 
 function row(label: string, cents: number, cls = ""): string {
   return `<tr class="row ${cls}"><td>${esc(label)}</td>${money(cents)}</tr>`;
+}
+
+/**
+ * Faturamento separado por marca (restaurantes que dividem o caixa): uma coluna por marca e o total,
+ * primeiro por forma de pagamento e depois por canal. Some quando a unidade tem um restaurante só.
+ */
+export function storeSection(lines: StoreBreakdownLine[] | undefined): string {
+  if (!lines || lines.length === 0) return "";
+  const head = `<tr><th></th>${lines.map((l) => `<th class="n">${esc(l.name)}</th>`).join("")}<th class="n">Total</th></tr>`;
+  const line = (label: string, values: number[], cls = "row") =>
+    `<tr class="${cls}"><td>${esc(label)}</td>${values.map(money).join("")}${money(values.reduce((a, v) => a + v, 0))}</tr>`;
+  const kindValue = (l: StoreBreakdownLine, k: string) => l.byKind.find((x) => x.kind === k)?.netCents ?? 0;
+  const kinds = PAYMENT_KINDS.filter((k) => lines.some((l) => kindValue(l, k) !== 0));
+  const channels = [...new Set(lines.flatMap((l) => l.byChannel.map((c) => c.channelName)))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const channelValue = (l: StoreBreakdownLine, name: string) => l.byChannel.find((c) => c.channelName === name)?.netCents ?? 0;
+  return `<h2>Faturamento por marca</h2>
+<table>${head}
+${kinds.map((k) => line(KIND_LABEL[k], lines.map((l) => kindValue(l, k)))).join("")}
+${line("Faturamento", lines.map((l) => l.revenueCents), "total")}
+</table>
+${channels.length ? `<h3>Por canal</h3><table>${head}${channels.map((n) => line(n, lines.map((l) => channelValue(l, n)))).join("")}</table>` : ""}
+<p class="small">As marcas dividem a gaveta e as maquininhas: a conferência e a divergência são do caixa todo.</p>`;
 }
 
 /** Relatório do turno no layout do pedido: abertura, vendas, movimentações, conferência e resultado. */
@@ -133,6 +155,7 @@ ${t.revenueAdjustmentCents ? row("(+/-) Ajustes de faturamento", t.revenueAdjust
 <tr class="total"><td>FATURAMENTO</td>${money(t.revenueCents)}</tr>
 </table>
 <p class="small">Cartões (crédito + débito): ${esc(formatBRL(t.cardsCents))}. O fundo de caixa não faz parte do faturamento.</p>
+${storeSection(d.byStore)}
 
 <h2>Movimentações</h2>
 <table>
@@ -253,6 +276,8 @@ export interface DayReportData {
     closingStatusText: string;
   }[];
   consolidation: DayConsolidation;
+  /** faturamento do dia separado por marca; vazio quando a unidade tem um restaurante só */
+  byStore?: StoreBreakdownLine[];
 }
 
 function shiftColumn(title: string, h: Headline, floatText: string): string {
@@ -299,6 +324,8 @@ ${row("Despesas", t.expensesCents)}
 <tr class="row"><td>Divergência líquida</td>${diffCell(t.divergenceNetCents)}</tr>
 <tr class="subrow"><td>Soma dos módulos das diferenças</td>${money(t.divergenceAbsCents)}</tr>
 </table>
+
+${storeSection(d.byStore)}
 
 <h2>Fundo de caixa</h2>
 <table>

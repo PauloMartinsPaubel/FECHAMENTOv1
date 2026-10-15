@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ActionForm } from "@/components/action-form";
 import { MoneyInput } from "@/components/money-input";
 import { Field } from "@/components/ui";
+import { StorePicker } from "@/components/store-picker";
 import type { ActionState } from "@/app/actions/types";
 import type { SaleShortcut } from "@/lib/sale-shortcuts";
 import {
@@ -19,6 +20,8 @@ export type CatalogView = {
   channels: { id: string; name: string }[];
   methods: { id: string; name: string; kind: string }[];
   brands: { id: string; name: string }[];
+  /** marcas ativas que dividem o caixa; o seletor só aparece com duas ou mais */
+  stores: { id: string; name: string }[];
 };
 
 function OnSuccess({ state, run }: { state: ActionState; run: () => void }) {
@@ -77,6 +80,8 @@ export function SaleForm({
   const [channelId, setChannelId] = useState(start?.channelId ?? catalog.channels[0]?.id ?? "");
   const [methodId, setMethodId] = useState(start?.paymentMethodId ?? defaultMethod?.id ?? "");
   const [brandId, setBrandId] = useState(start?.ticketBrandId ?? "");
+  // a marca fica escolhida entre uma venda e outra, como canal e forma; só não vem marcada de início
+  const [storeId, setStoreId] = useState("");
   const [n, setN] = useState(0);
   const kind = catalog.methods.find((m) => m.id === methodId)?.kind;
 
@@ -86,16 +91,21 @@ export function SaleForm({
     setChannelId(s.channelId);
     setMethodId(s.paymentMethodId);
     setBrandId(s.ticketBrandId ?? "");
+    if (s.storeId) setStoreId(s.storeId);
     focusAmount();
   };
   const isPicked = (s: SaleShortcut) =>
-    s.channelId === channelId && s.paymentMethodId === methodId && (kind !== "TICKET" || (s.ticketBrandId ?? "") === brandId);
+    s.channelId === channelId &&
+    s.paymentMethodId === methodId &&
+    (kind !== "TICKET" || (s.ticketBrandId ?? "") === brandId) &&
+    (!s.storeId || s.storeId === storeId);
 
   return (
     <ActionForm action={addSaleAction} idempotent hidden={{ sessionId }} className="grid gap-3 sm:grid-cols-6">
       {(state) => (
         <>
           <OnSuccess state={state} run={() => setN((x) => x + 1)} />
+          <StorePicker stores={catalog.stores} value={storeId} onChange={setStoreId} idPrefix="sale-store" className="sm:col-span-6" />
           {shortcuts.length > 0 ? (
             <div className="sm:col-span-6">
               <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">Lançamento rápido</div>
@@ -104,7 +114,7 @@ export function SaleForm({
                   const on = isPicked(s);
                   return (
                     <button
-                      key={`${s.channelId}:${s.paymentMethodId}:${s.ticketBrandId ?? ""}`}
+                      key={`${s.channelId}:${s.paymentMethodId}:${s.ticketBrandId ?? ""}:${s.storeId ?? ""}`}
                       type="button"
                       onClick={() => pick(s)}
                       aria-pressed={on}
@@ -222,6 +232,9 @@ export function MovementForm({ sessionId, catalog, correction }: { sessionId: st
               </Select>
             </Field>
           ) : null}
+          {needsChannel ? (
+            <StorePicker key={type} stores={catalog.stores} required={type === "ESTORNO"} idPrefix="mov-store" className="sm:col-span-6" />
+          ) : null}
           {type === "ESTORNO" ? (
             <Field label="Nº do pedido" htmlFor="orderNumber" className="sm:col-span-2">
               <input key={`o${n}`} id="orderNumber" name="orderNumber" maxLength={40} className="input" autoComplete="off" />
@@ -301,6 +314,7 @@ export type MovementView = {
   channelId: string | null;
   paymentMethodId: string | null;
   ticketBrandId: string | null;
+  storeId: string | null;
   orderNumber: string | null;
   description: string | null;
   isAdjustment: boolean;
@@ -348,6 +362,14 @@ export function MovementActions({ sessionId, m, catalog, employeeName }: { sessi
               <select id={`e-tb-${m.id}`} name="ticketBrandId" className="input" defaultValue={m.ticketBrandId ?? ""} required>
                 <option value="">Escolha...</option>
                 {catalog.brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </Field>
+          ) : null}
+          {hasChannel && catalog.stores.length >= 2 ? (
+            <Field label="Marca" htmlFor={`e-st-${m.id}`} className="sm:col-span-2">
+              <select id={`e-st-${m.id}`} name="storeId" className="input" defaultValue={m.storeId ?? ""} required={m.type !== "AJUSTE"}>
+                <option value="">{m.type === "AJUSTE" ? "Sem marca" : "Escolha..."}</option>
+                {catalog.stores.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
               </select>
             </Field>
           ) : null}

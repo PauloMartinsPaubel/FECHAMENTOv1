@@ -1,6 +1,7 @@
 import { cashCountTotal, describeCashCount, KIND_LABEL, PAYMENT_KINDS, parseStoredCashCount } from "@/lib/finance";
 import { fromDbDate } from "@/lib/dates";
 import type { ShiftReportData } from "@/lib/reports/types";
+import { describeStores } from "@/lib/reports/stores";
 import type { SessionBundle } from "../loaders";
 
 export interface ShiftReportOverrides {
@@ -121,6 +122,7 @@ export function buildShiftReportData(bundle: SessionBundle, overrides: ShiftRepo
     ticketBrands: s.byTicketBrand
       .map((b) => ({ name: brandName.get(b.ticketBrandId) ?? "Bandeira removida", netCents: b.netCents }))
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+    byStore: describeStores(s.byStore, cat.stores, cat.channels),
     cancellations: bundle.cancellations.map((c) => ({
       orderNumber: c.orderNumber,
       channelName: c.channel.name,

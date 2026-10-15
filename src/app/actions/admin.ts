@@ -14,6 +14,7 @@ import {
   saveRegister,
   saveSettings,
   saveShift,
+  saveStore,
   saveTicketBrand,
   updateUser,
 } from "@/server/services/admin";
@@ -90,6 +91,9 @@ export async function saveCatalogAction(_p: ActionState, fd: FormData): Promise<
         break;
       case "brand":
         await saveTicketBrand(actor, { id, name, active });
+        break;
+      case "store":
+        await saveStore(actor, { id, name, active });
         break;
       case "register":
         await saveRegister(actor, { id, name, active });

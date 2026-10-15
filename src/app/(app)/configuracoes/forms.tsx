@@ -67,7 +67,7 @@ export function WeeklyNowButton() {
 
 type Item = { id: string; name: string; active: boolean; isPlatform?: boolean; startTime?: string; endTime?: string; methodKind?: string; methodKindLabel?: string };
 
-export function CatalogRow({ kind, item }: { kind: "register" | "shift" | "channel" | "method" | "brand"; item: Item }) {
+export function CatalogRow({ kind, item }: { kind: "register" | "shift" | "channel" | "method" | "brand" | "store"; item: Item }) {
   const isCash = item.methodKind === "CASH";
   return (
     <li className="py-3">
@@ -94,8 +94,8 @@ const METHOD_KINDS = [
   ["CREDIT", "Cartão de crédito"], ["DEBIT", "Cartão de débito"], ["PIX", "PIX"], ["TICKET", "Tickets / Vales (por bandeira)"], ["ONLINE", "Pagamento online (por plataforma)"], ["OTHER", "Outros"],
 ];
 
-export function NewCatalogItem({ kind }: { kind: "register" | "channel" | "method" | "brand" }) {
-  const labels = { register: "Novo caixa", channel: "Novo canal", method: "Nova forma de pagamento", brand: "Nova bandeira de ticket" };
+export function NewCatalogItem({ kind }: { kind: "register" | "channel" | "method" | "brand" | "store" }) {
+  const labels = { register: "Novo caixa", channel: "Novo canal", method: "Nova forma de pagamento", brand: "Nova bandeira de ticket", store: "Nova marca" };
   return (
     <ActionForm action={saveCatalogAction} hidden={{ kind }} resetOnSuccess className="flex flex-wrap items-end gap-3">
       <Field label={labels[kind]} htmlFor={`new-${kind}`} className="min-w-48 flex-1"><input id={`new-${kind}`} name="name" required maxLength={100} className="input" /></Field>

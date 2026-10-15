@@ -38,6 +38,8 @@ export interface MovementRow {
   paymentMethodId: string | null;
   paymentKind: PaymentKind | null;
   ticketBrandId: string | null;
+  /** marca da venda quando a unidade tem mais de uma no mesmo caixa; ausente ou null = sem marca */
+  storeId?: string | null;
   orderNumber?: string | null;
   description?: string | null;
 }
@@ -122,6 +124,14 @@ export interface MatrixCell {
   netCents: number;
 }
 
+/** Faturamento de uma marca no caixa. storeId null = lançamentos sem marca (antigos ou ajustes gerais). */
+export interface StoreTotals {
+  storeId: string | null;
+  netCents: number;
+  byKind: Record<PaymentKind, number>;
+  byChannel: { channelId: string; netCents: number }[];
+}
+
 export interface SessionSummary {
   floatCents: number;
   grossSalesCents: number;
@@ -143,6 +153,8 @@ export interface SessionSummary {
   matrix: MatrixCell[];
   byChannel: { channelId: string; netCents: number }[];
   byTicketBrand: { ticketBrandId: string; netCents: number }[];
+  /** faturamento separado por marca; só tem itens quando algum lançamento traz marca */
+  byStore: StoreTotals[];
   movementCount: number;
   /** vazio quando tudo está coerente. O fechamento é bloqueado se houver itens. */
   integrityIssues: string[];

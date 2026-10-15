@@ -18,6 +18,6 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 export type Db = Pick<
   PrismaClient,
   | "user" | "role" | "authSession" | "restaurant" | "cashRegister" | "shift" | "salesChannel" | "paymentMethod"
-  | "ticketBrand" | "cashSession" | "cashMovement" | "cancellation" | "closingConference" | "cashClosing"
+  | "ticketBrand" | "store" | "cashSession" | "cashMovement" | "cancellation" | "closingConference" | "cashClosing"
   | "closingDetail" | "adjustment" | "auditLog" | "emailLog" | "setting" | "$queryRaw" | "$executeRaw"
 >;

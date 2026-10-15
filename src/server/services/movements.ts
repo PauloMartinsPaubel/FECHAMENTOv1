@@ -22,6 +22,8 @@ export interface MovementInput {
   channelId?: string | null;
   paymentMethodId?: string | null;
   ticketBrandId?: string | null;
+  /** marca do pedido; obrigatória em venda e estorno quando a unidade tem duas ou mais marcas ativas */
+  storeId?: string | null;
   orderNumber?: string | null;
   description?: string | null;
   employeeName?: string | null;
@@ -57,13 +59,14 @@ interface Shape {
   channelId: string | null;
   paymentMethodId: string | null;
   ticketBrandId: string | null;
+  storeId: string | null;
   paymentKind: PaymentKind | null;
   orderNumber: string | null;
   description: string | null;
   employeeName: string | null;
   occurredAt: Date | null;
   effects: Effects;
-  names: { channel: string | null; method: string | null; brand: string | null };
+  names: { channel: string | null; method: string | null; brand: string | null; store: string | null };
 }
 
 /** Valida tudo contra o cadastro do restaurante e decide os efeitos. */
@@ -82,6 +85,8 @@ async function resolveShape(db: Db, actor: Actor, input: MovementInput): Promise
   let methodId = input.paymentMethodId || null;
   let channelId = input.channelId || null;
   let brandId = input.ticketBrandId || null;
+  // só venda, estorno e ajuste têm marca; dinheiro que entra e sai da gaveta é do caixa todo
+  const storeId = input.type === "VENDA" || input.type === "ESTORNO" || input.type === "AJUSTE" ? input.storeId || null : null;
 
   // Suprimento e sangria são sempre em dinheiro e não têm canal
   if (input.type === "SUPRIMENTO" || input.type === "SANGRIA") {
@@ -96,14 +101,21 @@ async function resolveShape(db: Db, actor: Actor, input: MovementInput): Promise
     brandId = null;
   }
 
-  const [method, channel, brand] = await Promise.all([
+  const [method, channel, brand, store] = await Promise.all([
     methodId ? db.paymentMethod.findFirst({ where: { id: methodId, restaurantId: actor.restaurantId } }) : null,
     channelId ? db.salesChannel.findFirst({ where: { id: channelId, restaurantId: actor.restaurantId } }) : null,
     brandId ? db.ticketBrand.findFirst({ where: { id: brandId, restaurantId: actor.restaurantId } }) : null,
+    storeId ? db.store.findFirst({ where: { id: storeId, restaurantId: actor.restaurantId } }) : null,
   ]);
   if (methodId && !method) throw new ServiceError("Forma de pagamento não encontrada.");
   if (channelId && !channel) throw new ServiceError("Canal de venda não encontrado.");
   if (brandId && !brand) throw new ServiceError("Bandeira de ticket não encontrada.");
+  if (storeId && !store) throw new ServiceError("Marca não encontrada.");
+  if (!storeId && (input.type === "VENDA" || input.type === "ESTORNO")) {
+    // com duas marcas no mesmo caixa, venda sem marca deixaria a separação do relatório errada
+    const activeStores = await db.store.count({ where: { restaurantId: actor.restaurantId, active: true } });
+    if (activeStores >= 2) throw new ServiceError("Escolha de qual marca é o pedido.");
+  }
 
   const paymentKind = (method?.kind as PaymentKind | undefined) ?? null;
   let effects: Effects;
@@ -126,20 +138,22 @@ async function resolveShape(db: Db, actor: Actor, input: MovementInput): Promise
     channelId,
     paymentMethodId: methodId,
     ticketBrandId: brandId,
+    storeId,
     paymentKind,
     orderNumber,
     description,
     employeeName,
     occurredAt: input.occurredAt ?? null,
     effects,
-    names: { channel: channel?.name ?? null, method: method?.name ?? null, brand: brand?.name ?? null },
+    names: { channel: channel?.name ?? null, method: method?.name ?? null, brand: brand?.name ?? null, store: store?.name ?? null },
   };
 }
 
-function needsActive(shape: Shape, db: { channelActive: boolean | null; methodActive: boolean | null; brandActive: boolean | null }) {
+function needsActive(shape: Shape, db: { channelActive: boolean | null; methodActive: boolean | null; brandActive: boolean | null; storeActive: boolean | null }) {
   if (db.channelActive === false) throw new ServiceError(`O canal ${shape.names.channel} está desativado.`);
   if (db.methodActive === false) throw new ServiceError(`A forma de pagamento ${shape.names.method} está desativada.`);
   if (db.brandActive === false) throw new ServiceError(`A bandeira ${shape.names.brand} está desativada.`);
+  if (db.storeActive === false) throw new ServiceError(`A marca ${shape.names.store} está desativada.`);
 }
 
 const TYPE_LABEL: Record<MovementType, string> = {
@@ -164,12 +178,13 @@ async function createInTx(tx: Db, actor: Actor, session: { id: string; status: s
   const shape = await resolveShape(tx, actor, input);
 
   // só cadastros ativos podem ser usados em novos lançamentos
-  const [ch, pm, tb] = await Promise.all([
+  const [ch, pm, tb, st] = await Promise.all([
     shape.channelId ? tx.salesChannel.findUnique({ where: { id: shape.channelId }, select: { active: true } }) : null,
     shape.paymentMethodId ? tx.paymentMethod.findUnique({ where: { id: shape.paymentMethodId }, select: { active: true } }) : null,
     shape.ticketBrandId ? tx.ticketBrand.findUnique({ where: { id: shape.ticketBrandId }, select: { active: true } }) : null,
+    shape.storeId ? tx.store.findUnique({ where: { id: shape.storeId }, select: { active: true } }) : null,
   ]);
-  needsActive(shape, { channelActive: ch?.active ?? null, methodActive: pm?.active ?? null, brandActive: tb?.active ?? null });
+  needsActive(shape, { channelActive: ch?.active ?? null, methodActive: pm?.active ?? null, brandActive: tb?.active ?? null, storeActive: st?.active ?? null });
 
   // mesmo pedido, canal, forma, bandeira e valor já lançados: provável clique repetido
   if (shape.orderNumber && (shape.type === "VENDA" || shape.type === "ESTORNO") && !input.allowDuplicate) {
@@ -182,6 +197,7 @@ async function createInTx(tx: Db, actor: Actor, session: { id: string; status: s
         channelId: shape.channelId,
         paymentMethodId: shape.paymentMethodId,
         ticketBrandId: shape.ticketBrandId,
+        storeId: shape.storeId,
         amountCents: shape.amountCents,
       },
     });
@@ -204,6 +220,7 @@ async function createInTx(tx: Db, actor: Actor, session: { id: string; status: s
       channelId: shape.channelId,
       paymentMethodId: shape.paymentMethodId,
       ticketBrandId: shape.ticketBrandId,
+      storeId: shape.storeId,
       orderNumber: shape.orderNumber,
       description: shape.description,
       employeeName: shape.employeeName,
@@ -220,6 +237,7 @@ async function createInTx(tx: Db, actor: Actor, session: { id: string; status: s
     channel: shape.names.channel,
     method: shape.names.method,
     brand: shape.names.brand,
+    store: shape.names.store,
     orderNumber: shape.orderNumber,
     description: shape.description,
     revenueEffect: shape.effects.revenueEffect,
@@ -241,7 +259,7 @@ async function createInTx(tx: Db, actor: Actor, session: { id: string; status: s
       entityId: movement.id,
       field: `${TYPE_LABEL[shape.type]} incluída`,
       oldValue: null,
-      newValue: `${formatBRL(shape.amountCents)}${shape.names.method ? ` em ${shape.names.method}` : ""}${shape.names.channel ? ` (${shape.names.channel})` : ""}`,
+      newValue: `${formatBRL(shape.amountCents)}${shape.names.method ? ` em ${shape.names.method}` : ""}${shape.names.channel ? ` (${shape.names.channel})` : ""}${shape.names.store ? `, ${shape.names.store}` : ""}`,
       reason,
     });
   }
@@ -287,6 +305,7 @@ export interface MovementPatch {
   channelId?: string | null;
   paymentMethodId?: string | null;
   ticketBrandId?: string | null;
+  storeId?: string | null;
   orderNumber?: string | null;
   description?: string | null;
   employeeName?: string | null;
@@ -297,6 +316,7 @@ const FIELD_LABEL: Record<string, string> = {
   channelId: "Canal",
   paymentMethodId: "Forma de pagamento",
   ticketBrandId: "Bandeira do ticket",
+  storeId: "Marca",
   orderNumber: "Número do pedido",
   description: "Descrição",
   employeeName: "Funcionário",
@@ -328,6 +348,7 @@ export async function updateMovement(actor: Actor, movementId: string, patch: Mo
       channelId: patch.channelId !== undefined ? patch.channelId : current.channelId,
       paymentMethodId: patch.paymentMethodId !== undefined ? patch.paymentMethodId : current.paymentMethodId,
       ticketBrandId: patch.ticketBrandId !== undefined ? patch.ticketBrandId : current.ticketBrandId,
+      storeId: patch.storeId !== undefined ? patch.storeId : current.storeId,
       orderNumber: patch.orderNumber !== undefined ? patch.orderNumber : current.orderNumber,
       description: patch.description !== undefined ? patch.description : current.description,
       employeeName: patch.employeeName !== undefined ? patch.employeeName : current.employeeName,
@@ -340,6 +361,7 @@ export async function updateMovement(actor: Actor, movementId: string, patch: Mo
       channelId: current.channelId,
       paymentMethodId: current.paymentMethodId,
       ticketBrandId: current.ticketBrandId,
+      storeId: current.storeId,
       orderNumber: current.orderNumber,
       description: current.description,
       employeeName: current.employeeName,
@@ -349,6 +371,7 @@ export async function updateMovement(actor: Actor, movementId: string, patch: Mo
       channelId: shape.channelId,
       paymentMethodId: shape.paymentMethodId,
       ticketBrandId: shape.ticketBrandId,
+      storeId: shape.storeId,
       orderNumber: shape.orderNumber,
       description: shape.description,
       employeeName: shape.employeeName,
@@ -358,17 +381,18 @@ export async function updateMovement(actor: Actor, movementId: string, patch: Mo
 
     // nomes legíveis para o histórico
     const names = new Map<string, string>();
-    const ids = [before.channelId, after.channelId, before.paymentMethodId, after.paymentMethodId, before.ticketBrandId, after.ticketBrandId].filter(Boolean) as string[];
-    const [chs, pms, tbs] = await Promise.all([
+    const ids = [before.channelId, after.channelId, before.paymentMethodId, after.paymentMethodId, before.ticketBrandId, after.ticketBrandId, before.storeId, after.storeId].filter(Boolean) as string[];
+    const [chs, pms, tbs, sts] = await Promise.all([
       tx.salesChannel.findMany({ where: { id: { in: ids } } }),
       tx.paymentMethod.findMany({ where: { id: { in: ids } } }),
       tx.ticketBrand.findMany({ where: { id: { in: ids } } }),
+      tx.store.findMany({ where: { id: { in: ids } } }),
     ]);
-    [...chs, ...pms, ...tbs].forEach((x) => names.set(x.id, x.name));
+    [...chs, ...pms, ...tbs, ...sts].forEach((x) => names.set(x.id, x.name));
     const show = (k: keyof typeof before, v: string | number | null) => {
       if (v === null) return null;
       if (k === "amountCents") return formatBRL(v as number);
-      if (k === "channelId" || k === "paymentMethodId" || k === "ticketBrandId") return names.get(v as string) ?? String(v);
+      if (k === "channelId" || k === "paymentMethodId" || k === "ticketBrandId" || k === "storeId") return names.get(v as string) ?? String(v);
       return String(v);
     };
 

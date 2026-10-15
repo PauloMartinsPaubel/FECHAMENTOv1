@@ -63,6 +63,10 @@ Restaurante novo começa com 14 dias de teste grátis. O administrador assina em
 
 Variáveis na Vercel: `ASAAS_API_KEY` (chave da API), `ASAAS_ENV=production` (sem ela usa o sandbox de testes), `BILLING_PRICE_CENTS` (mensalidade em centavos, ex.: `14990`) e `ASAAS_WEBHOOK_TOKEN`. No painel do Asaas, configure o webhook para `https://SEU-DOMINIO/api/asaas/webhook`, com o mesmo token e os eventos de cobrança.
 
+## Marcas no mesmo caixa
+
+Para quem tem mais de um restaurante dividindo a mesma gaveta e as mesmas maquininhas (por exemplo, A Feijoada e Prato e Folha), cadastre as marcas em Configurações, em "Marcas no mesmo caixa". Com duas ou mais ativas, toda venda e todo estorno pedem a marca, inclusive na grade de totais; sangria, suprimento e despesa continuam sendo do caixa todo. A conferência e a divergência continuam únicas, e a nota de fechamento, o relatório do dia, a página Relatórios e as planilhas de vendas e movimentações trazem o faturamento separado por marca, por forma de pagamento e por canal. Vendas lançadas antes do cadastro aparecem como "Sem marca".
+
 ## Segurança da conta
 
 Em **Minha conta** (clique no nome, no topo) cada pessoa troca a senha, liga a verificação em duas etapas (código de um aplicativo autenticador, com 10 códigos de recuperação) e vê ou encerra os aparelhos conectados. Em Configurações, o administrador pode exigir a verificação de administradores e gerentes; quem ainda não ligou é levado para isso no próximo acesso. Quando alguém entra num navegador que nunca usou, o dono da conta recebe um e-mail com aparelho, horário e endereço.

@@ -4,14 +4,15 @@ import type { Catalog, CancellationRow, MovementRow, PaymentKind } from "@/lib/f
 import { evaluateSession, SessionEvaluation } from "@/lib/finance";
 
 export async function loadCatalogRows(db: Db, restaurantId: string) {
-  const [channels, methods, brands, registers, shifts] = await Promise.all([
+  const [channels, methods, brands, registers, shifts, stores] = await Promise.all([
     db.salesChannel.findMany({ where: { restaurantId }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
     db.paymentMethod.findMany({ where: { restaurantId }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
     db.ticketBrand.findMany({ where: { restaurantId }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
     db.cashRegister.findMany({ where: { restaurantId }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
     db.shift.findMany({ where: { restaurantId }, orderBy: [{ sortOrder: "asc" }] }),
+    db.store.findMany({ where: { restaurantId }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
   ]);
-  return { channels, methods, brands, registers, shifts };
+  return { channels, methods, brands, registers, shifts, stores };
 }
 export type CatalogRows = Awaited<ReturnType<typeof loadCatalogRows>>;
 
@@ -66,6 +67,7 @@ export async function loadSessionBundle(db: Db, restaurantId: string, sessionId:
         paymentMethod: { select: { kind: true, name: true } },
         channel: { select: { name: true } },
         ticketBrand: { select: { name: true } },
+        store: { select: { name: true } },
         createdBy: { select: { name: true } },
       },
       orderBy: [{ occurredAt: "asc" }, { createdAt: "asc" }],
@@ -96,6 +98,7 @@ export async function loadSessionBundle(db: Db, restaurantId: string, sessionId:
     paymentMethodId: m.paymentMethodId,
     paymentKind: (m.paymentMethod?.kind as PaymentKind | undefined) ?? null,
     ticketBrandId: m.ticketBrandId,
+    storeId: m.storeId,
     orderNumber: m.orderNumber,
     description: m.description,
   }));
