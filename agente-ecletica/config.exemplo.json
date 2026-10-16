@@ -1,0 +1,15 @@
+{
+  "url": "https://fechament-ov1.vercel.app/api/integracoes/ecletica",
+  "chave": "COLE AQUI A CHAVE GERADA EM INTEGRAÇÕES",
+  "mysql": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "user": "fechamento_leitura",
+    "password": "SENHA DO USUÁRIO SOMENTE LEITURA"
+  },
+  "bases": [
+    { "loja": "00000000ecleticaloja_bi", "tempoReal": "00000000ecleticavendas_bi" }
+  ],
+  "diasParaConferir": 3,
+  "intervaloMinutos": 5
+}

@@ -99,6 +99,9 @@ model Restaurant {
   billingPayments BillingPayment[]
   memberships     Membership[]
   stores          Store[]
+  ecleticaShifts  EcleticaShift[]
+  ecleticaSales   EcleticaSale[]
+  ecleticaCodes   EcleticaCode[]
 
   @@map("restaurants")
 }
@@ -635,6 +638,7 @@ model Setting {
 
 enum PlatformProvider {
   IFOOD
+  ECLETICA
 }
 
 enum PlatformOrderStatus {
@@ -659,6 +663,10 @@ model PlatformIntegration {
   lastSyncAt   DateTime?
   lastSyncOk   Boolean?
   lastSyncInfo String?
+  /// Eclética: SHA-256 da chave do programa instalado no restaurante (a chave só aparece uma vez, na hora de gerar)
+  agentTokenHash String?        @unique
+  /// versão do programa que mandou os dados por último
+  agentVersion   String?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
@@ -828,4 +836,113 @@ model Store {
 
   @@unique([restaurantId, name])
   @@map("stores")
+}
+
+/// Turno de caixa da Eclética, como veio do Eclética B.I pelo programa instalado no restaurante.
+/// Cada envio traz o turno inteiro: vendas e sangrias do turno são trocadas pelas novas.
+model EcleticaShift {
+  id           String    @id @default(uuid())
+  restaurantId String
+  /// cod_turno na Eclética
+  externalId   String
+  openedAt     DateTime
+  closedAt     DateTime?
+  /// turno ainda aberto no caixa (veio da base de tempo real)
+  open         Boolean   @default(false)
+  /// vlr_abre: fundo de abertura
+  floatCents   Int       @default(0)
+  /// vlr_fecha: valor informado no fechamento
+  closingCents Int?
+  machine      String?
+  operatorCode String?
+  receivedAt   DateTime  @default(now())
+
+  restaurant Restaurant         @relation(fields: [restaurantId], references: [id])
+  sales      EcleticaSale[]
+  cashMoves  EcleticaCashMove[]
+
+  @@unique([restaurantId, externalId])
+  @@index([restaurantId, openedAt])
+  @@map("ecletica_turnos")
+}
+
+/// Venda (cupom, mesa, comanda ou pedido de delivery) da Eclética. Sem dados do cliente.
+model EcleticaSale {
+  id              String    @id @default(uuid())
+  restaurantId    String
+  shiftId         String
+  /// cod_ctrl:num_ticket, único dentro do turno
+  externalKey     String
+  /// cod_estabelecimento: separa as marcas que rodam no mesmo sistema
+  establishment   String?
+  openedAt        DateTime?
+  closedAt        DateTime?
+  /// flag_dely: B balcão, M mesa, C comanda, D delivery
+  saleType        String?
+  /// origem_venda: canal (ex.: iFood)
+  origin          String?
+  /// flag_canc: * finalizada, C cancelada, D cancelada no delivery, A alterada
+  status          String
+  totalCents      Int
+  discountCents   Int       @default(0)
+  /// vlr_serv: taxa de serviço ou frete
+  serviceCents    Int       @default(0)
+  /// valores das colunas de pagamento da venda: dinheiro, cartao, cheque, vale_ref, outros, fiado
+  byColumn        Json
+  changeCents     Int       @default(0)
+  tipCents        Int       @default(0)
+  /// det_pagto: [{ key: "tipo_det|cod_det", valueCents }]
+  details         Json
+  /// id_pedido_externo: número do pedido na plataforma (iFood)
+  externalOrderId String?
+  cancelledAt     DateTime?
+  cancelReason    String?
+
+  restaurant Restaurant    @relation(fields: [restaurantId], references: [id])
+  shift      EcleticaShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@unique([shiftId, externalKey])
+  @@index([restaurantId, closedAt])
+  @@map("ecletica_vendas")
+}
+
+/// Sangria ou suprimento feito no caixa da Eclética.
+model EcleticaCashMove {
+  id         String    @id @default(uuid())
+  shiftId    String
+  occurredAt DateTime?
+  operator   String?
+  /// vlr_sangria_d, vlr_sangria_t e vlr_sangria_c, como a Eclética separa
+  dCents     Int       @default(0)
+  tCents     Int       @default(0)
+  cCents     Int       @default(0)
+  type       String?
+  reason     String?
+
+  shift EcleticaShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@index([shiftId])
+  @@map("ecletica_sangrias")
+}
+
+/// Códigos da Eclética que apareceram nos dados (estabelecimento, canal, forma de pagamento) e o cadastro
+/// do nosso sistema que corresponde a cada um. A correspondência é escolhida pelo administrador.
+model EcleticaCode {
+  id              String   @id @default(uuid())
+  restaurantId    String
+  /// ESTABELECIMENTO | CANAL | FORMA
+  kind            String
+  /// estabelecimento: cod_estabelecimento; canal: "flag_dely|origem_venda"; forma: coluna (dinheiro...) ou "tipo_det|cod_det"
+  externalKey     String
+  label           String?
+  storeId         String?
+  channelId       String?
+  paymentMethodId String?
+  ticketBrandId   String?
+  lastSeenAt      DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([restaurantId, kind, externalKey])
+  @@map("ecletica_codigos")
 }

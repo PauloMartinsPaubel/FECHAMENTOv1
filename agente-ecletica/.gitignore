@@ -1,0 +1,5 @@
+config.json
+estado.json
+agente.log
+agente.log.antigo
+node_modules/

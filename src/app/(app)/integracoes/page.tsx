@@ -10,6 +10,10 @@ import { clientIp, requirePermission } from "@/server/auth/current";
 import { prisma } from "@/server/db";
 import { getIfoodIntegration, listRecentPlatformOrders } from "@/server/services/integrations";
 import { IfoodSettingsForm } from "./settings-form";
+import { ecleticaStatus } from "@/server/services/ecletica";
+import { EcleticaEnabledForm, EcleticaKeyForm } from "./ecletica-forms";
+
+const CODE_KIND_LABEL: Record<string, string> = { ESTABELECIMENTO: "Estabelecimentos", CANAL: "Canais", FORMA: "Formas de pagamento" };
 
 export const metadata: Metadata = { title: "Integrações" };
 
@@ -20,11 +24,13 @@ const STATUS_LABEL: Record<string, string> = {
 export default async function IntegrationsPage() {
   const user = await requirePermission("reports.view");
   const actor = { ...user, ip: await clientIp() };
-  const [{ row, credentialsConfigured }, orders, channels] = await Promise.all([
+  const [{ row, credentialsConfigured }, orders, channels, ecl] = await Promise.all([
     getIfoodIntegration(actor),
     listRecentPlatformOrders(actor),
     prisma.salesChannel.findMany({ where: { restaurantId: user.restaurantId, active: true }, orderBy: { sortOrder: "asc" } }),
+    ecleticaStatus(actor),
   ]);
+  const isAdmin = can(user.role, "settings.manage");
   const ifoodChannel = channels.find((c) => c.name.toLowerCase() === "ifood");
 
   return (
@@ -63,6 +69,51 @@ export default async function IntegrationsPage() {
             {row?.lastSyncInfo ? <span className={row.lastSyncOk === false ? "text-red-700" : ""}> · {row.lastSyncInfo}</span> : null}
           </p>
         </div>
+      </section>
+
+      <section className="card space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-bold">Eclética</h2>
+          {!ecl.configured ? <Badge kind="CLOSED">Não configurada</Badge> : ecl.enabled ? <Badge kind="CORRETO">Recebendo</Badge> : <Badge kind="CLOSED">Desligada</Badge>}
+        </div>
+        <p className="text-sm text-stone-600">
+          Um programa instalado num computador do restaurante lê a cópia do banco da Eclética (Eclética B.I) e manda para cá os turnos, as vendas
+          com forma de pagamento, canal e marca, as sangrias e os cancelamentos. Ele só lê: nada muda na Eclética, e dados de clientes não são enviados.
+        </p>
+        {isAdmin ? (
+          <div className="flex flex-wrap items-start gap-4">
+            <EcleticaKeyForm hasKey={ecl.configured} />
+            {ecl.configured ? <EcleticaEnabledForm enabled={ecl.enabled} /> : null}
+          </div>
+        ) : null}
+        {ecl.configured ? (
+          <div className="space-y-3 border-t border-stone-200 pt-4 text-sm">
+            <p className="text-stone-600">
+              Último envio: {ecl.lastSyncAt ? formatDateTimeBR(ecl.lastSyncAt) : "nenhum ainda"}
+              {ecl.lastSyncInfo ? <span className={ecl.lastSyncOk === false ? "text-red-700" : ""}> · {ecl.lastSyncInfo}</span> : null}
+              {ecl.agentVersion ? <span className="text-stone-400"> · programa {ecl.agentVersion}</span> : null}
+            </p>
+            <p className="text-stone-600">Últimos 7 dias: {ecl.shifts7d} turno(s) e {ecl.sales7d} venda(s) recebidos.</p>
+            {ecl.codes.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-3">
+                {(["ESTABELECIMENTO", "CANAL", "FORMA"] as const).map((kind) => {
+                  const list = ecl.codes.filter((c) => c.kind === kind);
+                  return (
+                    <div key={kind}>
+                      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{CODE_KIND_LABEL[kind]}</h3>
+                      {list.length === 0 ? <p className="text-stone-400">nenhum ainda</p> : (
+                        <ul className="space-y-0.5">
+                          {list.map((c) => <li key={c.id}><span className="font-mono text-xs">{c.externalKey}</span>{c.label ? ` · ${c.label}` : ""}</li>)}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+            {ecl.codes.length > 0 ? <p className="text-xs text-stone-500">Esses são os códigos que a Eclética usa. A ligação de cada um com as marcas, canais e formas de pagamento daqui vem na próxima etapa.</p> : null}
+          </div>
+        ) : null}
       </section>
 
       <section>

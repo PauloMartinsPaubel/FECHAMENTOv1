@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { errorMessage, ServiceError } from "@/server/errors";
 import type { IfoodMerchant } from "@/server/integrations/ifood/client";
 import { autoSyncIfood, importIfoodReport, listIfoodMerchants, saveIfoodSettings, syncIfoodNow } from "@/server/services/integrations";
+import { generateEcleticaToken, setEcleticaEnabled } from "@/server/services/ecletica";
 import type { ActionState } from "./types";
 import { actorFromSession, bool, optStr, run, str } from "./util";
 
@@ -66,5 +67,28 @@ export async function importIfoodReportAction(_p: ActionState, fd: FormData): Pr
     if (r.errors.length) parts.push(`${r.errors.length} linha(s) com erro: ${r.errors.slice(0, 3).join(" ")}`);
     if (r.warnings.length) parts.push(`avisos: ${r.warnings.slice(0, 3).join(" ")}`);
     return parts.join("; ") + ".";
+  });
+}
+
+export type EcleticaKeyState = { token?: string; error?: string } | null;
+
+/** Gera a chave do programa da Eclética. Ela volta para a tela uma vez só. */
+export async function generateEcleticaTokenAction(_p: EcleticaKeyState, _fd: FormData): Promise<EcleticaKeyState> {
+  try {
+    const token = await generateEcleticaToken(await actorFromSession());
+    revalidatePath("/integracoes");
+    return { token };
+  } catch (err) {
+    if (err && typeof err === "object" && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
+    return { error: errorMessage(err) };
+  }
+}
+
+export async function setEcleticaEnabledAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  return run(async () => {
+    const enabled = bool(fd, "enabled");
+    await setEcleticaEnabled(await actorFromSession(), enabled);
+    revalidatePath("/integracoes");
+    return enabled ? "Recebimento da Eclética ligado." : "Recebimento da Eclética desligado. O programa continua rodando, mas os envios são recusados.";
   });
 }

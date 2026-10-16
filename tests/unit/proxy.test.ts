@@ -26,7 +26,7 @@ describe("middleware: login e política de conteúdo", () => {
     expect(middleware(req("/")).headers.get("location")).toBe("https://caixa.test/conheca");
     expect(middleware(req("/caixa?x=1")).headers.get("location")).toBe("https://caixa.test/login");
     expect(middleware(req("/conta/senha")).headers.get("location")).toBe("https://caixa.test/login");
-    for (const open of ["/conheca", "/senha/esqueci", "/cadastro", "/termos", "/privacidade", "/ir/whatsapp", "/api/cron/backup", "/api/health", "/login/codigo"]) {
+    for (const open of ["/conheca", "/senha/esqueci", "/cadastro", "/termos", "/privacidade", "/ir/whatsapp", "/api/cron/backup", "/api/health", "/login/codigo", "/api/integracoes/ecletica"]) {
       expect(middleware(req(open)).headers.get("location"), open).toBeNull();
     }
   });

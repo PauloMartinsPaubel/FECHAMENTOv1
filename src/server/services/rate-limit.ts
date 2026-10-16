@@ -10,6 +10,8 @@ export const LIMITS = {
   cadastro: { limit: 10, windowMs: 60 * 60_000 },
   site: { limit: 200, windowMs: 60 * 60_000 },
   "duas-etapas": { limit: 10, windowMs: 15 * 60_000 },
+  /** envios do programa da Eclética (alguns por ciclo de 5 minutos) */
+  integracao: { limit: 120, windowMs: 15 * 60_000 },
 } as const;
 export type Bucket = keyof typeof LIMITS;
 

@@ -7,11 +7,11 @@ import { purgeOldHits } from "./rate-limit";
 
 /**
  * Tabelas da cópia, na ordem de restauração (quem é referenciado vem antes).
- * Ficam de fora as sessões de login e os links de troca de senha (tokens), os erros do monitoramento, as visitas da página de apresentação
- * e o registro de tentativas: não fazem falta numa restauração.
+ * Ficam de fora as sessões de login e os links de troca de senha (tokens), os erros do monitoramento, as visitas da página de apresentação,
+ * o registro de tentativas e os turnos e vendas recebidos da Eclética (o programa do restaurante manda de novo): não fazem falta numa restauração.
  */
 export const BACKUP_TABLES = [
-  "roles", "restaurants", "settings", "cash_registers", "shifts", "sales_channels", "payment_methods", "ticket_brands", "stores",
+  "roles", "restaurants", "settings", "cash_registers", "shifts", "sales_channels", "payment_methods", "ticket_brands", "stores", "ecletica_codigos",
   "users", "memberships", "cash_sessions", "cash_movements", "cancellations", "adjustments", "closing_conferences",
   "cash_closings", "closing_details", "email_logs", "audit_logs", "platform_integrations", "platform_orders",
   "platform_events", "billing_payments",

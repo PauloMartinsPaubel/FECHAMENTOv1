@@ -67,6 +67,10 @@ Variáveis na Vercel: `ASAAS_API_KEY` (chave da API), `ASAAS_ENV=production` (se
 
 Para quem tem mais de um restaurante dividindo a mesma gaveta e as mesmas maquininhas (por exemplo, A Feijoada e Prato e Folha), cadastre as marcas em Configurações, em "Marcas no mesmo caixa". Com duas ou mais ativas, toda venda e todo estorno pedem a marca, inclusive na grade de totais; sangria, suprimento e despesa continuam sendo do caixa todo. A conferência e a divergência continuam únicas, e a nota de fechamento, o relatório do dia, a página Relatórios e as planilhas de vendas e movimentações trazem o faturamento separado por marca, por forma de pagamento e por canal. Vendas lançadas antes do cadastro aparecem como "Sem marca".
 
+## Integração com a Eclética
+
+O restaurante que usa a Eclética instala o Eclética B.I (uma cópia do banco da loja num MySQL local, feita pela Eclética) e, no mesmo computador, o programa da pasta `agente-ecletica`. O programa lê os turnos fechados e manda para `/api/integracoes/ecletica` com a chave gerada em Integrações; o servidor guarda turnos, vendas e sangrias em `ecletica_turnos`, `ecletica_vendas` e `ecletica_sangrias`, sempre substituindo o turno inteiro, e os códigos de marca, canal e forma de pagamento em `ecletica_codigos`. Dados de cliente não são lidos. A instalação passo a passo está em `agente-ecletica/LEIAME.md`. No banco de produção, rode antes a migração `prisma/migrations/20261016120000_ecletica/migration.sql`.
+
 ## Segurança da conta
 
 Em **Minha conta** (clique no nome, no topo) cada pessoa troca a senha, liga a verificação em duas etapas (código de um aplicativo autenticador, com 10 códigos de recuperação) e vê ou encerra os aparelhos conectados. Em Configurações, o administrador pode exigir a verificação de administradores e gerentes; quem ainda não ligou é levado para isso no próximo acesso. Quando alguém entra num navegador que nunca usou, o dono da conta recebe um e-mail com aparelho, horário e endereço.

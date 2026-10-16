@@ -2,8 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const COOKIE = "fc_session";
 
-/** Endereços abertos sem login. api/cron: chamado pela Vercel sem cookie; a rota confere o CRON_SECRET. */
-const PUBLIC = /^\/(login|senha\/|conheca|ir\/|cadastro|termos|privacidade|api\/cron|api\/asaas|api\/health)/;
+/**
+ * Endereços abertos sem login. api/cron: chamado pela Vercel sem cookie; a rota confere o CRON_SECRET.
+ * api/integracoes/ecletica: chamado pelo programa do restaurante; a rota confere a chave dele.
+ */
+const PUBLIC = /^\/(login|senha\/|conheca|ir\/|cadastro|termos|privacidade|api\/cron|api\/asaas|api\/health|api\/integracoes\/ecletica)/;
 
 /**
  * Política de conteúdo: o navegador só carrega estilos, imagens e vídeos do próprio site e só conversa com ele.
