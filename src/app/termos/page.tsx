@@ -34,7 +34,8 @@ export default function TermsPage() {
         O restaurante novo tem {TRIAL_DAYS} dias de teste grátis, sem compromisso. Depois disso, o uso completo depende de assinatura, mensal
         ou anual (paga de uma vez, com desconto), no valor informado na tela Assinatura no momento da contratação. A cobrança é feita pela
         plataforma Asaas, e cada fatura pode ser paga por PIX, boleto ou cartão. Integrações automáticas com outros sistemas (como a Eclética)
-        não fazem parte da assinatura: são contratadas e cobradas à parte.
+        não fazem parte da assinatura padrão: a implantação é cobrada à parte, e a assinatura com integração tem valor próprio, informado
+        na contratação.
       </p>
       <p>
         Se uma cobrança não for paga, o Sistema avisa e continua funcionando por {GRACE_DAYS} dias após o vencimento. Passado esse prazo,

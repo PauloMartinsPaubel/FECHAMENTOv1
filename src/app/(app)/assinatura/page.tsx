@@ -66,7 +66,7 @@ export default async function BillingPage() {
         </section>
       )}
 
-      <p className="text-sm text-stone-600">Integrações automáticas com outros sistemas, como a Eclética, são cobradas à parte da assinatura.</p>
+      <p className="text-sm text-stone-600">Com integração automática a outros sistemas, como a Eclética, a implantação é cobrada à parte e a mensalidade é outra. Valores sob consulta com o suporte.</p>
 
       <section>
         <h2 className="card-title">Cobranças</h2>

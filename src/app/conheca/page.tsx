@@ -211,7 +211,7 @@ export default async function LandingPage() {
           </div>
           <p className="mt-6 max-w-2xl text-green-50">
             PIX, boleto ou cartão. Cancele quando quiser, sem multa. Se uma mensalidade atrasar, o sistema continua funcionando por {GRACE_DAYS} dias, e nenhum dado é apagado.
-            Integrações automáticas com outros sistemas, como a Eclética, são cobradas à parte.
+            Com integração automática a outros sistemas, como a Eclética, a implantação é cobrada à parte e a mensalidade é outra: valores sob consulta.
           </p>
           {plan ? <a href={plan.href} className="mt-8 inline-flex min-h-11 items-center rounded-lg bg-white px-6 font-semibold text-brand-700 hover:bg-green-50">{plan.label}</a> : null}
           {inviteHref ? <p className="mt-3 text-sm text-green-50"><a href={inviteHref} className="underline">Já tenho um código de convite</a></p> : null}
