@@ -7,7 +7,7 @@ import { bootstrap, Env } from "./setup";
 import { registerRestaurant } from "@/server/services/signup";
 import { openSession } from "@/server/services/sessions";
 import { assertCanOpenCash, cancelSubscription, getAccessState, subscribe, syncBillingPayments } from "@/server/services/billing";
-import { nextMonthSameDay } from "@/lib/billing";
+import { nextMonthSameDay, nextYearSameDay } from "@/lib/billing";
 import { POST } from "@/app/api/asaas/webhook/route";
 import { addDays, todayIso } from "@/lib/dates";
 import type { Actor } from "@/server/actor";
@@ -18,6 +18,7 @@ class FakeAsaas {
   url = "";
   calls: { method: string; path: string; body: any; key: string }[] = [];
   payments: any[] = [];
+  subscriptions = 0;
   async start() {
     this.server = http.createServer((req, res) => {
       let raw = "";
@@ -29,11 +30,15 @@ class FakeAsaas {
         if (req.headers["access_token"] !== "chave-teste") return send(401, { errors: [{ description: "Chave inválida" }] });
         if (req.method === "POST" && req.url === "/customers") return send(200, { id: "cus_1" });
         if (req.method === "POST" && req.url === "/subscriptions") {
-          this.payments = [{ id: "pay_1", status: "PENDING", value: 99.9, dueDate: body.nextDueDate, invoiceUrl: "https://asaas/fatura/1", subscription: "sub_1" }];
-          return send(200, { id: "sub_1" });
+          // a primeira assinatura é sub_1 com a cobrança pay_1; as seguintes, sub_2/pay_sub2 e assim por diante
+          const n = ++this.subscriptions;
+          const sub = n === 1 ? "sub_1" : `sub_${n}`;
+          this.payments.push({ id: n === 1 ? "pay_1" : `pay_${sub}`, status: "PENDING", value: body.value, dueDate: body.nextDueDate, invoiceUrl: `https://asaas/fatura/${n}`, subscription: sub });
+          return send(200, { id: sub });
         }
-        if (req.method === "GET" && req.url?.startsWith("/subscriptions/sub_1/payments")) return send(200, { data: this.payments });
-        if (req.method === "DELETE" && req.url === "/subscriptions/sub_1") return send(200, { deleted: true });
+        const list = req.url?.match(/^\/subscriptions\/(sub_\w+)\/payments/);
+        if (req.method === "GET" && list) return send(200, { data: this.payments.filter((p) => p.subscription === list[1]) });
+        if (req.method === "DELETE" && /^\/subscriptions\/sub_\w+$/.test(req.url ?? "")) return send(200, { deleted: true });
         send(404, { errors: [{ description: "não encontrado" }] });
       });
     });
@@ -132,6 +137,32 @@ describe("cobrança pelo Asaas", () => {
     // assinar de novo antes do fim do mês pago: a primeira cobrança só vence depois dele
     const again = await subscribe(actor, { document: "11.222.333/0001-81", email: "financeiro@bistro.com" }, config());
     expect(again.nextDueDate).toBe(addDays(covered, 1));
+  });
+
+  it("plano anual: só se estiver configurado; cobra o ano de uma vez e garante o ano inteiro", async () => {
+    // troca de plano = cancelar e assinar de novo
+    await cancelSubscription(actor, config());
+    delete process.env.BILLING_ANNUAL_PRICE_CENTS;
+    await expect(subscribe(actor, { document: "11.222.333/0001-81", email: "financeiro@bistro.com", cycle: "YEARLY" }, config())).rejects.toThrow(/plano anual não está disponível/);
+    process.env.BILLING_ANNUAL_PRICE_CENTS = "99900";
+    const covered = addDays(nextMonthSameDay(today), -1);
+    const r = await subscribe(actor, { document: "11.222.333/0001-81", email: "financeiro@bistro.com", cycle: "YEARLY" }, config());
+    expect(r).toMatchObject({ cycle: "YEARLY", nextDueDate: addDays(covered, 1) }); // o mês já pago continua valendo
+    const call = fake.calls.filter((c) => c.path === "/subscriptions").at(-1)!;
+    expect(call.body).toMatchObject({ cycle: "YEARLY", value: 999, description: expect.stringContaining("plano anual") });
+    const sub = (await prisma.restaurant.findUniqueOrThrow({ where: { id: restaurantId } })).asaasSubscriptionId!;
+    const pay = await prisma.billingPayment.findFirstOrThrow({ where: { asaasPaymentId: `pay_${sub}` } });
+    expect(pay).toMatchObject({ cycle: "YEARLY", valueCents: 99900, status: "PENDING" });
+    expect((await getAccessState(restaurantId)).message).toMatch(/Próxima anuidade em/);
+
+    // pagou a anuidade e depois cancelou: liberado até a véspera do vencimento do ano seguinte
+    await webhook({ event: "PAYMENT_RECEIVED", payment: { id: `pay_${sub}`, status: "RECEIVED", value: 999, dueDate: r.nextDueDate, paymentDate: today, subscription: sub } });
+    expect((await prisma.billingPayment.findFirstOrThrow({ where: { asaasPaymentId: `pay_${sub}` } })).cycle).toBe("YEARLY");
+    await cancelSubscription(actor, config());
+    const yearEnd = addDays(nextYearSameDay(r.nextDueDate), -1);
+    const access = await getAccessState(restaurantId);
+    expect(access).toMatchObject({ reason: "canceled", level: "warning" });
+    expect(access.message).toContain(yearEnd.split("-").reverse().join("/"));
     expect(await prisma.auditLog.count({ where: { restaurantId, action: { in: ["billing.subscribe", "billing.cancel", "billing.payment_event"] } } })).toBeGreaterThanOrEqual(4);
   });
 });

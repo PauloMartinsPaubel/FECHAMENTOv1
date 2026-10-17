@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanCpfCnpj, computeAccess, coveredUntil, nextMonthSameDay } from "@/lib/billing";
+import { annualDeal, cleanCpfCnpj, computeAccess, coveredUntil, nextMonthSameDay, nextYearSameDay } from "@/lib/billing";
 
 const T = "2026-10-08";
 describe("acesso pela assinatura", () => {
@@ -27,6 +27,18 @@ describe("acesso pela assinatura", () => {
     expect(nextMonthSameDay("2026-12-15")).toBe("2027-01-15");
     expect(coveredUntil("2026-10-30", [{ status: "CONFIRMED", dueDate: "2026-09-10" }, { status: "RECEIVED", dueDate: "2026-10-10" }])).toBe("2026-11-09");
     expect(coveredUntil(null, [])).toBeNull();
+  });
+  it("plano anual: o ano seguinte, a anuidade garante um ano, as mensagens falam em anuidade e a conta do desconto", () => {
+    expect(nextYearSameDay("2026-10-31")).toBe("2027-10-31");
+    expect(nextYearSameDay("2028-02-29")).toBe("2029-02-28");
+    expect(coveredUntil(null, [{ status: "RECEIVED", dueDate: "2026-10-31", cycle: "YEARLY" }])).toBe("2027-10-30");
+    expect(coveredUntil(null, [{ status: "RECEIVED", dueDate: "2026-10-31", cycle: "MONTHLY" }])).toBe("2026-11-29");
+    const yearly = (status: string, dueDate: string) => computeAccess({ plan: "SUBSCRIBED", cycle: "YEARLY", trialEndDate: null, payments: [{ status, dueDate }], today: T });
+    expect(yearly("PENDING", "2026-10-20").message).toBe("Próxima anuidade em 20/10/2026.");
+    expect(yearly("OVERDUE", "2026-09-30").message).toMatch(/^Anuidade vencida em 30\/09\/2026/);
+    expect(computeAccess({ plan: "CANCELED", cycle: "YEARLY", trialEndDate: null, payments: [{ status: "RECEIVED", dueDate: "2026-03-01", cycle: "YEARLY" }], today: T }).level).toBe("warning");
+    expect(annualDeal(8990, 89900)).toEqual({ savedCents: 17980, perMonthCents: 7492, monthsFree: 2 });
+    expect(annualDeal(8990, 90000).monthsFree).toBeNull();
   });
   it("teste grátis: liberado, aviso nos últimos dias, só leitura depois", () => {
     expect(computeAccess({ plan: "TRIAL", trialEndDate: "2026-10-20", payments: [], today: T })).toMatchObject({ level: "full", message: "Teste grátis até 20/10/2026." });

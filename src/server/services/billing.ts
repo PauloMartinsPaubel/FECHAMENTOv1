@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { addDays, fromDbDate, todayIso, toDbDate } from "@/lib/dates";
-import { cleanCpfCnpj, computeAccess, coveredUntil, isPaidStatus, TRIAL_DAYS, type AccessState, type BillingPlanCode } from "@/lib/billing";
+import { cleanCpfCnpj, computeAccess, coveredUntil, isPaidStatus, TRIAL_DAYS, type AccessState, type BillingCycleCode, type BillingPlanCode } from "@/lib/billing";
 import { decimalToCents } from "../integrations/shared";
 import { Actor, assertCan } from "../actor";
 import { audit } from "../audit";
@@ -27,6 +27,12 @@ export function asaasConfigFromEnv(): AsaasConfig | null {
 
 export function priceCentsFromEnv(): number | null {
   const v = Number(process.env.BILLING_PRICE_CENTS);
+  return Number.isInteger(v) && v > 0 ? v : null;
+}
+
+/** Valor do plano anual (pago de uma vez). Sem a variável, só existe o mensal. */
+export function annualPriceCentsFromEnv(): number | null {
+  const v = Number(process.env.BILLING_ANNUAL_PRICE_CENTS);
   return Number.isInteger(v) && v > 0 ? v : null;
 }
 
@@ -72,17 +78,18 @@ const OPEN_OR_PAID = ["PENDING", "OVERDUE", "RECEIVED", "CONFIRMED", "RECEIVED_I
 async function accessFor(restaurantId: string, today = todayIso()) {
   const r = await prisma.restaurant.findUniqueOrThrow({
     where: { id: restaurantId },
-    select: { billingPlan: true, trialEndsAt: true },
+    select: { billingPlan: true, billingCycle: true, trialEndsAt: true },
   });
   // em aberto contam para o assinante; pagas, para saber até quando vai quem cancelou
   const payments =
     r.billingPlan === "SUBSCRIBED" || r.billingPlan === "CANCELED"
-      ? await prisma.billingPayment.findMany({ where: { restaurantId, status: { in: [...OPEN_OR_PAID] } }, select: { status: true, dueDate: true } })
+      ? await prisma.billingPayment.findMany({ where: { restaurantId, status: { in: [...OPEN_OR_PAID] } }, select: { status: true, dueDate: true, cycle: true } })
       : [];
   return computeAccess({
     plan: r.billingPlan as BillingPlanCode,
+    cycle: r.billingCycle,
     trialEndDate: r.trialEndsAt ? fromDbDate(r.trialEndsAt) : null,
-    payments: payments.map((p) => ({ status: p.status, dueDate: fromDbDate(p.dueDate) })),
+    payments: payments.map((p) => ({ status: p.status, dueDate: fromDbDate(p.dueDate), cycle: p.cycle })),
     today,
   });
 }
@@ -118,11 +125,13 @@ export async function getBillingOverview(actor: Actor) {
     payments,
     access,
     priceCents: priceCentsFromEnv(),
+    annualPriceCents: annualPriceCentsFromEnv(),
     asaasReady: asaasConfigFromEnv() !== null && priceCentsFromEnv() !== null,
   };
 }
 
-async function savePayment(restaurantId: string, p: AsaasPayment) {
+/** `cycle` só vale ao criar: a cobrança nasce com o ciclo da assinatura que a gerou e não muda depois. */
+async function savePayment(restaurantId: string, p: AsaasPayment, cycle: BillingCycleCode = "MONTHLY") {
   const valueCents = decimalToCents(p.value) ?? 0;
   const paidOn = p.paymentDate || p.clientPaymentDate;
   const data = {
@@ -135,7 +144,7 @@ async function savePayment(restaurantId: string, p: AsaasPayment) {
   return prisma.billingPayment.upsert({
     where: { asaasPaymentId: p.id },
     update: data,
-    create: { ...data, restaurantId, asaasPaymentId: p.id },
+    create: { ...data, restaurantId, asaasPaymentId: p.id, cycle },
   });
 }
 
@@ -144,7 +153,7 @@ export async function syncBillingPayments(restaurantId: string, config = asaasCo
   const r = await prisma.restaurant.findUniqueOrThrow({ where: { id: restaurantId } });
   if (!r.asaasSubscriptionId || !config) return 0;
   const res = await asaas<{ data: AsaasPayment[] }>(config, "GET", `/subscriptions/${encodeURIComponent(r.asaasSubscriptionId)}/payments?limit=100`);
-  for (const p of res.data ?? []) await savePayment(restaurantId, p);
+  for (const p of res.data ?? []) await savePayment(restaurantId, p, r.billingCycle);
   return res.data?.length ?? 0;
 }
 
@@ -152,10 +161,12 @@ export async function syncBillingPayments(restaurantId: string, config = asaasCo
  * Cria cliente e assinatura mensal no Asaas. A primeira mensalidade vence no fim do teste grátis
  * (ou hoje, se o teste já acabou). "UNDEFINED" deixa o cliente escolher PIX, boleto ou cartão na fatura.
  */
-export async function subscribe(actor: Actor, input: { document: string; email: string }, config = asaasConfigFromEnv(), today = todayIso()) {
+export async function subscribe(actor: Actor, input: { document: string; email: string; cycle?: string }, config = asaasConfigFromEnv(), today = todayIso()) {
   assertCan(actor, "settings.manage");
-  const price = priceCentsFromEnv();
-  if (!config || !price) throw new ServiceError("A cobrança ainda não está configurada no servidor (ASAAS_API_KEY e BILLING_PRICE_CENTS).", "STATE");
+  const cycle: BillingCycleCode = input.cycle === "YEARLY" ? "YEARLY" : "MONTHLY";
+  const price = cycle === "YEARLY" ? annualPriceCentsFromEnv() : priceCentsFromEnv();
+  if (!config || !priceCentsFromEnv()) throw new ServiceError("A cobrança ainda não está configurada no servidor (ASAAS_API_KEY e BILLING_PRICE_CENTS).", "STATE");
+  if (!price) throw new ServiceError("O plano anual não está disponível. Escolha o mensal.");
   const document = cleanCpfCnpj(input.document);
   if (!document) throw new ServiceError("CPF ou CNPJ inválido. Confira os números.");
   const [email] = parseRecipients(input.email);
@@ -170,26 +181,26 @@ export async function subscribe(actor: Actor, input: { document: string; email: 
     (await asaas<{ id: string }>(config, "POST", "/customers", { name: r.name, cpfCnpj: document, email, externalReference: r.id, notificationDisabled: false })).id;
 
   // a primeira cobrança vence depois do que já está garantido (teste grátis ou mês pago antes de cancelar)
-  const paid = await prisma.billingPayment.findMany({ where: { restaurantId: r.id }, select: { status: true, dueDate: true } });
-  const until = coveredUntil(r.trialEndsAt ? fromDbDate(r.trialEndsAt) : null, paid.map((p) => ({ status: p.status, dueDate: fromDbDate(p.dueDate) })));
+  const paid = await prisma.billingPayment.findMany({ where: { restaurantId: r.id }, select: { status: true, dueDate: true, cycle: true } });
+  const until = coveredUntil(r.trialEndsAt ? fromDbDate(r.trialEndsAt) : null, paid.map((p) => ({ status: p.status, dueDate: fromDbDate(p.dueDate), cycle: p.cycle })));
   const nextDueDate = until && until >= today ? addDays(until, 1) : today;
   const sub = await asaas<{ id: string }>(config, "POST", "/subscriptions", {
     customer: customerId,
     billingType: "UNDEFINED",
     value: price / 100,
     nextDueDate,
-    cycle: "MONTHLY",
-    description: `Fechamento de Caixa - ${r.name}`,
+    cycle,
+    description: `Fechamento de Caixa - ${r.name}${cycle === "YEARLY" ? " (plano anual)" : ""}`,
     externalReference: r.id,
   });
 
   await prisma.restaurant.update({
     where: { id: r.id },
-    data: { billingPlan: "SUBSCRIBED", billingDocument: document, billingEmail: email, asaasCustomerId: customerId, asaasSubscriptionId: sub.id },
+    data: { billingPlan: "SUBSCRIBED", billingCycle: cycle, billingDocument: document, billingEmail: email, asaasCustomerId: customerId, asaasSubscriptionId: sub.id },
   });
-  await audit(prisma, actor, { action: "billing.subscribe", entity: "restaurant", entityId: r.id, newValue: { subscription: sub.id, nextDueDate, valueCents: price } });
+  await audit(prisma, actor, { action: "billing.subscribe", entity: "restaurant", entityId: r.id, newValue: { subscription: sub.id, cycle, nextDueDate, valueCents: price } });
   await syncBillingPayments(r.id, config).catch(() => 0);
-  return { subscriptionId: sub.id, nextDueDate };
+  return { subscriptionId: sub.id, nextDueDate, cycle };
 }
 
 export async function cancelSubscription(actor: Actor, config = asaasConfigFromEnv()) {
@@ -222,7 +233,9 @@ export async function handleAsaasEvent(body: unknown): Promise<{ handled: boolea
     (p.externalReference ? await prisma.restaurant.findUnique({ where: { id: p.externalReference } }).catch(() => null) : null);
   if (!restaurant) return { handled: false, reason: "assinatura desconhecida" };
   const status = event.event === "PAYMENT_DELETED" ? "DELETED" : p.status;
-  await savePayment(restaurant.id, { ...p, status });
+  // cobrança de uma assinatura antiga (antes de trocar de plano) não herda o ciclo da atual
+  const cycle = p.subscription && p.subscription === restaurant.asaasSubscriptionId ? restaurant.billingCycle : "MONTHLY";
+  await savePayment(restaurant.id, { ...p, status }, cycle);
   await prisma.auditLog.create({
     data: {
       restaurantId: restaurant.id,

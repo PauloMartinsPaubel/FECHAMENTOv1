@@ -10,7 +10,7 @@ import { prisma } from "../db";
  * (direto ou pelo caixa/fechamento a que a linha pertence). Senhas cifradas e controles de login ficam de fora.
  */
 const SHEETS: { file: string; title: string; sql: string }[] = [
-  { file: "restaurante", title: "Dados do restaurante", sql: `SELECT id, name, document, timezone, "createdAt", "billingPlan", "trialEndsAt", "billingDocument", "billingEmail" FROM restaurants WHERE id = $1` },
+  { file: "restaurante", title: "Dados do restaurante", sql: `SELECT id, name, document, timezone, "createdAt", "billingPlan", "billingCycle", "trialEndsAt", "billingDocument", "billingEmail" FROM restaurants WHERE id = $1` },
   { file: "configuracoes", title: "Configurações", sql: `SELECT * FROM settings WHERE "restaurantId" = $1` },
   { file: "usuarios", title: "Usuários", sql: `SELECT u.id, u.name, u.email, r.code AS role, u.active, u."lastLoginAt", u."createdAt" FROM users u JOIN roles r ON r.id = u."roleId" WHERE u."restaurantId" = $1 ORDER BY u.name` },
   { file: "acessos_de_outras_unidades", title: "Acessos de outras unidades", sql: `SELECT m.id, u.name, u.email, r.code AS role, m.active, m."createdAt" FROM memberships m JOIN users u ON u.id = m."userId" JOIN roles r ON r.id = m."roleId" WHERE m."restaurantId" = $1` },
@@ -29,7 +29,7 @@ const SHEETS: { file: string; title: string; sql: string }[] = [
   { file: "correcoes", title: "Correções", sql: `SELECT * FROM adjustments WHERE "restaurantId" = $1 ORDER BY "createdAt"` },
   { file: "emails_enviados", title: "E-mails enviados", sql: `SELECT * FROM email_logs WHERE "restaurantId" = $1 ORDER BY "createdAt"` },
   { file: "pedidos_ifood", title: "Pedidos do iFood", sql: `SELECT * FROM platform_orders WHERE "restaurantId" = $1 ORDER BY "createdAt"` },
-  { file: "mensalidades", title: "Mensalidades", sql: `SELECT * FROM billing_payments WHERE "restaurantId" = $1 ORDER BY "dueDate"` },
+  { file: "mensalidades", title: "Cobranças da assinatura", sql: `SELECT * FROM billing_payments WHERE "restaurantId" = $1 ORDER BY "dueDate"` },
   { file: "auditoria", title: "Auditoria", sql: `SELECT * FROM audit_logs WHERE "restaurantId" = $1 ORDER BY "createdAt"` },
 ];
 

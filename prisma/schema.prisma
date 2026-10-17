@@ -76,6 +76,8 @@ model Restaurant {
 
   /// EXEMPT = não paga (restaurante da casa); TRIAL = teste grátis; SUBSCRIBED = assinatura criada no Asaas; CANCELED
   billingPlan         BillingPlan @default(TRIAL)
+  /// ciclo da assinatura atual (ou da última)
+  billingCycle        BillingCycle @default(MONTHLY)
   trialEndsAt         DateTime?
   billingDocument     String?
   billingEmail        String?
@@ -113,6 +115,12 @@ enum BillingPlan {
   CANCELED
 }
 
+/// Ciclo da assinatura no Asaas: mensal ou anual (paga de uma vez, com desconto).
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
 /// Cobranças da assinatura, como o Asaas informa (webhook ou consulta). Nunca apagadas.
 model BillingPayment {
   id             String    @id @default(uuid())
@@ -121,6 +129,8 @@ model BillingPayment {
   /// status do Asaas: PENDING, RECEIVED, CONFIRMED, OVERDUE, REFUNDED, RECEIVED_IN_CASH...
   status         String
   valueCents     Int
+  /// ciclo da assinatura que gerou a cobrança: diz quanto tempo uma cobrança paga garante
+  cycle          BillingCycle @default(MONTHLY)
   dueDate        DateTime  @db.Date
   paidAt         DateTime?
   invoiceUrl     String?

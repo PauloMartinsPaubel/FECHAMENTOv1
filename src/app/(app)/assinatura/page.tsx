@@ -21,20 +21,25 @@ const STATUS: Record<string, string> = {
 
 export default async function BillingPage() {
   const user = await requirePermission("settings.manage");
-  const { restaurant: r, payments, access, priceCents, asaasReady } = await getBillingOverview({ ...user, ip: await clientIp() });
+  const { restaurant: r, payments, access, priceCents, annualPriceCents, asaasReady } = await getBillingOverview({ ...user, ip: await clientIp() });
+  const yearly = r.billingCycle === "YEARLY";
+  // o valor de quem já assina é o da cobrança mais recente (a variável pode ter mudado depois)
+  const currentCents = payments[0]?.valueCents ?? (yearly ? annualPriceCents : priceCents);
   const tone = access.level === "readonly" ? "error" : access.level === "warning" ? "warn" : "ok";
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Assinatura" subtitle="Mensalidade do sistema para este restaurante." />
+      <PageHeader title="Assinatura" subtitle="Plano do sistema para este restaurante." />
       <Alert tone={tone}>{access.message}</Alert>
 
       {r.billingPlan === "EXEMPT" ? null : r.billingPlan === "SUBSCRIBED" ? (
         <section className="card space-y-3">
           <h2 className="card-title">Assinatura ativa</h2>
           <p className="text-sm text-stone-700">
-            Mensalidade de <strong>{priceCents ? formatBRL(priceCents) : "-"}</strong>, cobrada pelo Asaas no e-mail <strong>{r.billingEmail}</strong>.
+            {yearly ? "Plano anual de " : "Mensalidade de "}
+            <strong>{currentCents ? formatBRL(currentCents) : "-"}</strong>{yearly ? " por ano, cobrado" : ", cobrada"} pelo Asaas no e-mail <strong>{r.billingEmail}</strong>.
             Cada fatura deixa escolher PIX, boleto ou cartão.
+            {yearly || annualPriceCents ? " Para mudar de plano, cancele e assine de novo: o período já pago continua valendo e a primeira cobrança do plano novo só vence depois dele." : ""}
           </p>
           <div className="flex flex-wrap gap-3">
             <SyncForm />
@@ -47,12 +52,13 @@ export default async function BillingPage() {
           {asaasReady ? (
             <>
               <p className="text-sm text-stone-700">
-                Mensalidade de <strong>{formatBRL(priceCents!)}</strong> por restaurante.
+                Mensalidade de <strong>{formatBRL(priceCents!)}</strong> por restaurante
+                {annualPriceCents ? <>, ou <strong>{formatBRL(annualPriceCents)}</strong> por ano no plano anual, pago de uma vez</> : null}.
                 {r.billingPlan === "TRIAL" && r.trialEndsAt ? ` Assinando agora, a primeira cobrança só vence depois do teste grátis (que vai até ${formatDateBR(fromDbDate(r.trialEndsAt))}).` : ""}
                 {r.billingPlan === "CANCELED" && access.level !== "readonly" ? " Assinando de novo agora, a primeira cobrança só vence depois do período que já está liberado." : ""}
                 {" "}A fatura chega por e-mail e pode ser paga por PIX, boleto ou cartão.
               </p>
-              <SubscribeForm defaultEmail={user.email} />
+              <SubscribeForm defaultEmail={user.email} monthlyCents={priceCents!} annualCents={annualPriceCents} />
             </>
           ) : (
             <p className="text-sm text-stone-600">A cobrança ainda não foi ligada no servidor. Fale com o suporte do sistema.</p>
@@ -60,16 +66,19 @@ export default async function BillingPage() {
         </section>
       )}
 
+      <p className="text-sm text-stone-600">Integrações automáticas com outros sistemas, como a Eclética, são cobradas à parte da assinatura.</p>
+
       <section>
-        <h2 className="card-title">Mensalidades</h2>
+        <h2 className="card-title">Cobranças</h2>
         {payments.length === 0 ? (
-          <Empty>Nenhuma mensalidade ainda.</Empty>
+          <Empty>Nenhuma cobrança ainda.</Empty>
         ) : (
           <ul className="divide-y divide-stone-200 rounded-xl border border-stone-200 bg-white">
             {payments.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
                 <div>
                   <strong>Vencimento {formatDateBR(fromDbDate(p.dueDate))}</strong>
+                  {p.cycle === "YEARLY" ? <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Anual</span> : null}
                   <div className="text-stone-600">{formatBRL(p.valueCents)}{p.paidAt ? ` · paga em ${formatDateBR(fromDbDate(p.paidAt))}` : ""}</div>
                 </div>
                 <div className="flex items-center gap-3">

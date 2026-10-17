@@ -36,6 +36,7 @@ export default async function IntegrationsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Integrações" subtitle="Pedidos que chegam direto das plataformas, para conferir o caixa sem digitar." />
+      <p className="text-sm text-stone-600">As integrações automáticas são cobradas à parte da assinatura. Para contratar, fale com o suporte.</p>
 
       <section className="card space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">

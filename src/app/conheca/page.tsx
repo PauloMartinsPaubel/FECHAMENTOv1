@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { formatBRL } from "@/lib/finance";
-import { GRACE_DAYS, TRIAL_DAYS } from "@/lib/billing";
+import { annualDeal, GRACE_DAYS, TRIAL_DAYS } from "@/lib/billing";
 import { SUPPORT } from "@/lib/legal/company";
-import { priceCentsFromEnv } from "@/server/services/billing";
+import { annualPriceCentsFromEnv, priceCentsFromEnv } from "@/server/services/billing";
 import { signupOpen } from "@/server/services/signup";
 import { recordSiteEvent, sourceFromReferrer } from "@/server/services/site-stats";
 
@@ -59,6 +59,8 @@ const go = (dest: "whatsapp" | "cadastro" | "entrar", from: string) => `/ir/${de
 
 export default async function LandingPage() {
   const price = priceCentsFromEnv();
+  const annual = annualPriceCentsFromEnv();
+  const deal = price && annual ? annualDeal(price, annual) : null;
   const open = signupOpen();
   const h = await headers();
   // pré-carregamento de link não é visita
@@ -198,9 +200,18 @@ export default async function LandingPage() {
               <p className="text-5xl font-extrabold">{price ? formatBRL(price) : "Consulte"}</p>
               <p className="mt-1 text-green-100">{price ? "por mês, por unidade" : "o valor por unidade"}</p>
             </div>
+            {annual && deal ? (
+              <div>
+                <p className="text-5xl font-extrabold">{formatBRL(annual)}</p>
+                <p className="mt-1 text-green-100">
+                  por ano, pago de uma vez{deal.monthsFree ? ` (${deal.monthsFree} ${deal.monthsFree === 1 ? "mês" : "meses"} grátis)` : ` (economia de ${formatBRL(deal.savedCents)})`}
+                </p>
+              </div>
+            ) : null}
           </div>
           <p className="mt-6 max-w-2xl text-green-50">
             PIX, boleto ou cartão. Cancele quando quiser, sem multa. Se uma mensalidade atrasar, o sistema continua funcionando por {GRACE_DAYS} dias, e nenhum dado é apagado.
+            Integrações automáticas com outros sistemas, como a Eclética, são cobradas à parte.
           </p>
           {plan ? <a href={plan.href} className="mt-8 inline-flex min-h-11 items-center rounded-lg bg-white px-6 font-semibold text-brand-700 hover:bg-green-50">{plan.label}</a> : null}
           {inviteHref ? <p className="mt-3 text-sm text-green-50"><a href={inviteHref} className="underline">Já tenho um código de convite</a></p> : null}

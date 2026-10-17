@@ -31,12 +31,13 @@ export default function TermsPage() {
 
       <H>3. Teste grátis, assinatura e pagamento</H>
       <p>
-        O restaurante novo tem {TRIAL_DAYS} dias de teste grátis, sem compromisso. Depois disso, o uso completo depende de assinatura mensal,
-        no valor informado na tela Assinatura no momento da contratação. A cobrança é feita pela plataforma Asaas, e cada fatura pode ser paga
-        por PIX, boleto ou cartão.
+        O restaurante novo tem {TRIAL_DAYS} dias de teste grátis, sem compromisso. Depois disso, o uso completo depende de assinatura, mensal
+        ou anual (paga de uma vez, com desconto), no valor informado na tela Assinatura no momento da contratação. A cobrança é feita pela
+        plataforma Asaas, e cada fatura pode ser paga por PIX, boleto ou cartão. Integrações automáticas com outros sistemas (como a Eclética)
+        não fazem parte da assinatura: são contratadas e cobradas à parte.
       </p>
       <p>
-        Se uma mensalidade não for paga, o Sistema avisa e continua funcionando por {GRACE_DAYS} dias após o vencimento. Passado esse prazo,
+        Se uma cobrança não for paga, o Sistema avisa e continua funcionando por {GRACE_DAYS} dias após o vencimento. Passado esse prazo,
         a conta fica em modo de consulta: não é possível abrir caixa novo, mas relatórios, histórico e o fechamento de caixa já aberto continuam
         disponíveis. O acesso completo volta assim que o pagamento é confirmado. Nenhum dado é apagado por atraso.
       </p>
@@ -44,7 +45,7 @@ export default function TermsPage() {
         O administrador pode cancelar a assinatura a qualquer momento, na tela Assinatura, sem multa. O cancelamento interrompe as cobranças
         seguintes, e o Sistema continua funcionando normalmente até o fim do período já pago (ou do teste grátis, se ele terminar depois);
         só então a conta passa para o modo de consulta. Por isso, não há devolução proporcional do período já pago. Podemos reajustar o valor
-        da mensalidade com aviso prévio de 30 dias por e-mail ao administrador.
+        da assinatura com aviso prévio de 30 dias por e-mail ao administrador; no plano anual, o reajuste só vale a partir da renovação.
       </p>
 
       <H>4. Responsabilidades do restaurante</H>

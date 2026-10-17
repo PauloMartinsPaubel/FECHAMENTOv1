@@ -9,9 +9,9 @@ import { actorFromSession, run, str } from "./util";
 export async function subscribeAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   return run(async () => {
     const actor = await actorFromSession();
-    const r = await subscribe(actor, { document: str(fd, "document"), email: str(fd, "email") });
+    const r = await subscribe(actor, { document: str(fd, "document"), email: str(fd, "email"), cycle: str(fd, "cycle") });
     revalidatePath("/", "layout");
-    return `Assinatura criada. A primeira mensalidade vence em ${formatDateBR(r.nextDueDate)}; a fatura chega por e-mail e aparece aqui.`;
+    return `Assinatura criada. A primeira ${r.cycle === "YEARLY" ? "anuidade" : "mensalidade"} vence em ${formatDateBR(r.nextDueDate)}; a fatura chega por e-mail e aparece aqui.`;
   });
 }
 

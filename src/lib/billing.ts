@@ -13,6 +13,7 @@
 import { addDays } from "./dates";
 
 export type BillingPlanCode = "EXEMPT" | "TRIAL" | "SUBSCRIBED" | "CANCELED";
+export type BillingCycleCode = "MONTHLY" | "YEARLY";
 
 export const GRACE_DAYS = 7;
 export const WARN_DAYS = 3;
@@ -25,9 +26,11 @@ export const isPaidStatus = (s: string) => PAID.has(s);
 
 export interface AccessInput {
   plan: BillingPlanCode;
+  /** só muda as palavras: "mensalidade" ou "anuidade" */
+  cycle?: BillingCycleCode;
   /** último dia do teste (aaaa-mm-dd, horário local) */
   trialEndDate: string | null;
-  payments: { status: string; dueDate: string }[];
+  payments: { status: string; dueDate: string; cycle?: BillingCycleCode }[];
   today: string;
 }
 
@@ -52,23 +55,44 @@ export function nextMonthSameDay(iso: string): string {
   return `${ny}-${String(nm).padStart(2, "0")}-${String(Math.min(d, last)).padStart(2, "0")}`;
 }
 
+/** Mesmo dia no ano seguinte; 29/02 vira 28/02. */
+export function nextYearSameDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const last = new Date(Date.UTC(y + 1, m, 0)).getUTCDate();
+  return `${y + 1}-${String(m).padStart(2, "0")}-${String(Math.min(d, last)).padStart(2, "0")}`;
+}
+
+/** Vencimento seguinte no ciclo da assinatura. */
+export function nextDueInCycle(iso: string, cycle: BillingCycleCode = "MONTHLY"): string {
+  return cycle === "YEARLY" ? nextYearSameDay(iso) : nextMonthSameDay(iso);
+}
+
 /**
  * Último dia já garantido ao restaurante: o fim do teste grátis ou, se for depois, a véspera do vencimento
- * seguinte à última mensalidade paga (a mensalidade que vence em 31/10 cobre até 29/11).
+ * seguinte à última cobrança paga (a mensalidade que vence em 31/10 cobre até 29/11; a anuidade, até 30/10 do ano seguinte).
  */
-export function coveredUntil(trialEndDate: string | null, payments: { status: string; dueDate: string }[]): string | null {
+export function coveredUntil(trialEndDate: string | null, payments: { status: string; dueDate: string; cycle?: BillingCycleCode }[]): string | null {
   let until = trialEndDate;
   for (const p of payments) {
     if (!isPaidStatus(p.status)) continue;
-    const end = addDays(nextMonthSameDay(p.dueDate), -1);
+    const end = addDays(nextDueInCycle(p.dueDate, p.cycle), -1);
     if (!until || end > until) until = end;
   }
   return until;
 }
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
+/** Quanto o plano anual economiza em relação a 12 mensalidades, e quantos meses isso dá. */
+export function annualDeal(monthlyCents: number, annualCents: number) {
+  const savedCents = monthlyCents * 12 - annualCents;
+  const monthsFree = savedCents / monthlyCents;
+  return { savedCents, perMonthCents: Math.round(annualCents / 12), monthsFree: Number.isInteger(monthsFree) ? monthsFree : null };
+}
+
 export function computeAccess(input: AccessInput): AccessState {
   const { plan, today } = input;
+  const fee = input.cycle === "YEARLY" ? "anuidade" : "mensalidade";
+  const Fee = fee[0].toUpperCase() + fee.slice(1);
   if (plan === "EXEMPT") return { level: "full", reason: "exempt", message: "Restaurante isento de assinatura." };
   if (plan === "CANCELED") {
     const until = coveredUntil(input.trialEndDate, input.payments);
@@ -92,13 +116,13 @@ export function computeAccess(input: AccessInput): AccessState {
   const open = input.payments.filter((p) => OPEN.has(p.status)).sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
   if (!open) return { level: "full", reason: "active", message: "Assinatura em dia." };
   const late = daysBetween(open.dueDate, today);
-  if (late > GRACE_DAYS) return { level: "readonly", reason: "blocked", message: `Mensalidade vencida em ${br(open.dueDate)} e não paga. Abrir caixa fica bloqueado até o pagamento.` };
+  if (late > GRACE_DAYS) return { level: "readonly", reason: "blocked", message: `${Fee} vencida em ${br(open.dueDate)} e não paga. Abrir caixa fica bloqueado até o pagamento.` };
   if (late > 0) {
     const left = GRACE_DAYS - late;
-    return { level: "warning", reason: "grace", message: `Mensalidade vencida em ${br(open.dueDate)}. Pague para não bloquear a abertura de caixa${left > 0 ? ` (bloqueia em ${plural(left, "dia", "dias")})` : " (bloqueia amanhã)"}.` };
+    return { level: "warning", reason: "grace", message: `${Fee} vencida em ${br(open.dueDate)}. Pague para não bloquear a abertura de caixa${left > 0 ? ` (bloqueia em ${plural(left, "dia", "dias")})` : " (bloqueia amanhã)"}.` };
   }
-  if (-late < WARN_DAYS) return { level: "warning", reason: "due_soon", message: late === 0 ? "A mensalidade vence hoje." : `A mensalidade vence em ${plural(-late, "dia", "dias")} (${br(open.dueDate)}).` };
-  return { level: "full", reason: "active", message: `Próxima mensalidade em ${br(open.dueDate)}.` };
+  if (-late < WARN_DAYS) return { level: "warning", reason: "due_soon", message: late === 0 ? `A ${fee} vence hoje.` : `A ${fee} vence em ${plural(-late, "dia", "dias")} (${br(open.dueDate)}).` };
+  return { level: "full", reason: "active", message: `Próxima ${fee} em ${br(open.dueDate)}.` };
 }
 
 /** Valida CPF (11 dígitos) ou CNPJ (14) pelos dígitos verificadores. Devolve só os números, ou null. */
