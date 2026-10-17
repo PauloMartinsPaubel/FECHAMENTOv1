@@ -42,8 +42,9 @@ export default function TermsPage() {
       </p>
       <p>
         O administrador pode cancelar a assinatura a qualquer momento, na tela Assinatura, sem multa. O cancelamento interrompe as cobranças
-        seguintes; não há devolução proporcional do período já pago. Podemos reajustar o valor da mensalidade com aviso prévio de 30 dias
-        por e-mail ao administrador.
+        seguintes, e o Sistema continua funcionando normalmente até o fim do período já pago (ou do teste grátis, se ele terminar depois);
+        só então a conta passa para o modo de consulta. Por isso, não há devolução proporcional do período já pago. Podemos reajustar o valor
+        da mensalidade com aviso prévio de 30 dias por e-mail ao administrador.
       </p>
 
       <H>4. Responsabilidades do restaurante</H>
