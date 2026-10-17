@@ -33,7 +33,7 @@ export default async function ClosingDetail({ params }: { params: Promise<{ clos
         <Alert tone="warn">Este caixa foi reaberto para correção. O relatório abaixo mostra os valores do último fechamento (revisão {closing.revision}).</Alert>
       ) : null}
       <style dangerouslySetInnerHTML={{ __html: REPORT_CSS }} />
-      <div className="rounded-xl border border-stone-200 bg-white p-4 sm:p-8 print:border-0 print:p-0" dangerouslySetInnerHTML={{ __html: renderShiftReport(data, corrections) }} />
+      <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white p-3 sm:p-8 print:overflow-visible print:border-0 print:p-0" dangerouslySetInnerHTML={{ __html: renderShiftReport(data, corrections) }} />
     </div>
   );
 }

@@ -36,7 +36,7 @@ export default async function DayPage({ searchParams }: { searchParams: Promise<
       </form>
       {report.sessions.length === 0 ? <Alert tone="info">Nenhum caixa foi aberto neste dia.</Alert> : null}
       <style dangerouslySetInnerHTML={{ __html: REPORT_CSS }} />
-      <div className="rounded-xl border border-stone-200 bg-white p-4 sm:p-8 print:border-0 print:p-0" dangerouslySetInnerHTML={{ __html: renderDayReport(report) }} />
+      <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white p-3 sm:p-8 print:overflow-visible print:border-0 print:p-0" dangerouslySetInnerHTML={{ __html: renderDayReport(report) }} />
     </div>
   );
 }

@@ -5,13 +5,15 @@
   "description": "Lê o Eclética B.I (MySQL local) e manda os turnos para o Fechamento de Caixa",
   "type": "module",
   "main": "agente.mjs",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node agente.mjs",
     "uma-vez": "node agente.mjs --uma-vez",
     "testar": "node agente.mjs --testar"
   },
   "dependencies": {
-    "mysql2": "3.11.5"
+    "mysql2": "3.24.6"
   }
 }

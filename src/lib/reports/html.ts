@@ -41,7 +41,7 @@ export const REPORT_CSS = `
 .rpt .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .rpt .foot{margin-top:24px;font-size:11px;color:#78716c;text-align:center}
 @media print{.rpt{max-width:none;font-size:12px}.rpt .noprint{display:none!important}.rpt h2{break-after:avoid}.rpt table,.rpt .box{break-inside:avoid}}
-@media (max-width:560px){.rpt .two,.rpt .meta{grid-template-columns:1fr}}
+@media (max-width:560px){.rpt .two,.rpt .meta{grid-template-columns:1fr}.rpt{font-size:13px}.rpt td,.rpt th{padding:4px 3px}.rpt th{font-size:11px}}
 `;
 
 const money = (c: number) => `<td class="n">${esc(formatBRL(c))}</td>`;

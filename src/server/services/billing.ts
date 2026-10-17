@@ -36,6 +36,16 @@ export function annualPriceCentsFromEnv(): number | null {
   return Number.isInteger(v) && v > 0 ? v : null;
 }
 
+/**
+ * Preço que vale para este restaurante. Com mensalidade combinada (ex.: com integração), o plano anual só
+ * existe se também tiver sido combinado: o anual padrão sairia mais barato que a mensalidade dele.
+ */
+export function effectivePrices(r: { customPriceCents: number | null; customAnnualPriceCents: number | null }) {
+  const monthly = r.customPriceCents ?? priceCentsFromEnv();
+  const annual = r.customPriceCents != null ? r.customAnnualPriceCents : (r.customAnnualPriceCents ?? annualPriceCentsFromEnv());
+  return { monthly, annual };
+}
+
 async function asaas<T>(config: AsaasConfig, method: string, path: string, body?: unknown): Promise<T> {
   let res: Response;
   try {
@@ -120,13 +130,14 @@ export async function getBillingOverview(actor: Actor) {
     prisma.billingPayment.findMany({ where: { restaurantId: actor.restaurantId }, orderBy: { dueDate: "desc" }, take: 24 }),
     accessFor(actor.restaurantId),
   ]);
+  const prices = effectivePrices(restaurant);
   return {
     restaurant,
     payments,
     access,
-    priceCents: priceCentsFromEnv(),
-    annualPriceCents: annualPriceCentsFromEnv(),
-    asaasReady: asaasConfigFromEnv() !== null && priceCentsFromEnv() !== null,
+    priceCents: prices.monthly,
+    annualPriceCents: prices.annual,
+    asaasReady: asaasConfigFromEnv() !== null && prices.monthly !== null,
   };
 }
 
@@ -164,15 +175,16 @@ export async function syncBillingPayments(restaurantId: string, config = asaasCo
 export async function subscribe(actor: Actor, input: { document: string; email: string; cycle?: string }, config = asaasConfigFromEnv(), today = todayIso()) {
   assertCan(actor, "settings.manage");
   const cycle: BillingCycleCode = input.cycle === "YEARLY" ? "YEARLY" : "MONTHLY";
-  const price = cycle === "YEARLY" ? annualPriceCentsFromEnv() : priceCentsFromEnv();
-  if (!config || !priceCentsFromEnv()) throw new ServiceError("A cobrança ainda não está configurada no servidor (ASAAS_API_KEY e BILLING_PRICE_CENTS).", "STATE");
+  const r = await prisma.restaurant.findUniqueOrThrow({ where: { id: actor.restaurantId } });
+  const prices = effectivePrices(r);
+  const price = cycle === "YEARLY" ? prices.annual : prices.monthly;
+  if (!config || !prices.monthly) throw new ServiceError("A cobrança ainda não está configurada no servidor (ASAAS_API_KEY e BILLING_PRICE_CENTS).", "STATE");
   if (!price) throw new ServiceError("O plano anual não está disponível. Escolha o mensal.");
   const document = cleanCpfCnpj(input.document);
   if (!document) throw new ServiceError("CPF ou CNPJ inválido. Confira os números.");
   const [email] = parseRecipients(input.email);
   if (!email) throw new ServiceError("Informe o e-mail que recebe as faturas.");
 
-  const r = await prisma.restaurant.findUniqueOrThrow({ where: { id: actor.restaurantId } });
   if (r.billingPlan === "EXEMPT") throw new ServiceError("Este restaurante é isento de assinatura.", "STATE");
   if (r.billingPlan === "SUBSCRIBED" && r.asaasSubscriptionId) throw new ServiceError("A assinatura já está ativa.", "STATE");
 
@@ -201,6 +213,16 @@ export async function subscribe(actor: Actor, input: { document: string; email: 
   await audit(prisma, actor, { action: "billing.subscribe", entity: "restaurant", entityId: r.id, newValue: { subscription: sub.id, cycle, nextDueDate, valueCents: price } });
   await syncBillingPayments(r.id, config).catch(() => 0);
   return { subscriptionId: sub.id, nextDueDate, cycle };
+}
+
+/** Muda o valor da assinatura no Asaas, inclusive da cobrança que ainda não foi paga. */
+export async function updateSubscriptionValue(restaurantId: string, valueCents: number, config = asaasConfigFromEnv()) {
+  const r = await prisma.restaurant.findUniqueOrThrow({ where: { id: restaurantId } });
+  if (r.billingPlan !== "SUBSCRIBED" || !r.asaasSubscriptionId) return false;
+  if (!config) throw new ServiceError("A cobrança não está configurada no servidor.", "STATE");
+  await asaas(config, "PUT", `/subscriptions/${encodeURIComponent(r.asaasSubscriptionId)}`, { value: valueCents / 100, updatePendingPayments: true });
+  await syncBillingPayments(restaurantId, config).catch(() => 0);
+  return true;
 }
 
 export async function cancelSubscription(actor: Actor, config = asaasConfigFromEnv()) {

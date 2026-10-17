@@ -61,7 +61,9 @@ Em `/cadastro` (link na tela de login), um restaurante novo cria a própria cont
 
 Restaurante novo começa com 14 dias de teste grátis. O administrador assina em **Assinatura** (CPF ou CNPJ e e-mail das faturas); o Asaas cria a assinatura mensal e cada fatura deixa pagar por PIX, boleto ou cartão. Mensalidade vencida: aviso por 7 dias e, depois, o restaurante fica só leitura (não abre caixa novo; relatórios, histórico e caixa já aberto continuam). Pagou, libera na hora. O restaurante da instalação é isento.
 
-Variáveis na Vercel: `ASAAS_API_KEY` (chave da API), `ASAAS_ENV=production` (sem ela usa o sandbox de testes), `BILLING_PRICE_CENTS` (mensalidade em centavos, ex.: `14990`) e `ASAAS_WEBHOOK_TOKEN`. No painel do Asaas, configure o webhook para `https://SEU-DOMINIO/api/asaas/webhook`, com o mesmo token e os eventos de cobrança.
+Variáveis na Vercel: `ASAAS_API_KEY` (chave da API), `ASAAS_ENV=production` (sem ela usa o sandbox de testes), `BILLING_PRICE_CENTS` (mensalidade em centavos, ex.: `8990`), `BILLING_ANNUAL_PRICE_CENTS` (plano anual pago de uma vez; sem ela, só existe o mensal) e `ASAAS_WEBHOOK_TOKEN`.
+
+Preço combinado com um restaurante (por exemplo, com integração): em Gestão > Plataforma, que só aparece para os e-mails em `PLATFORM_ADMIN_EMAILS` (separados por vírgula), com papel de administrador e verificação em duas etapas ligada. Lá dá para definir mensalidade e anual próprios e estender o teste grátis. Se o restaurante já assina, o valor da assinatura no Asaas e a cobrança em aberto mudam junto; a mudança fica na auditoria do restaurante. No painel do Asaas, configure o webhook para `https://SEU-DOMINIO/api/asaas/webhook`, com o mesmo token e os eventos de cobrança.
 
 ## Marcas no mesmo caixa
 

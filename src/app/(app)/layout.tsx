@@ -6,29 +6,54 @@ import { getAccessState } from "@/server/services/billing";
 import { listAccessibleUnits } from "@/server/services/units";
 import { UnitSwitcher } from "@/components/unit-switcher";
 import { SupportLinks } from "@/components/support-links";
+import { MainNav } from "@/components/main-nav";
+import { isPlatformAdmin } from "@/server/services/platform";
 
 export const dynamic = "force-dynamic";
 
-const NAV: { href: string; label: string; perm?: Permission }[] = [
+type NavDef = { href: string; label: string; perm?: Permission };
+
+/** O que se usa todo dia fica à vista; o resto vai nos grupos. */
+const PRIMARY: NavDef[] = [
   { href: "/", label: "Início" },
   { href: "/caixa", label: "Caixa" },
   { href: "/dia", label: "Dia", perm: "reports.view" },
-  { href: "/relatorios", label: "Relatórios", perm: "reports.view" },
-  { href: "/tendencias", label: "Tendências", perm: "reports.view" },
-  { href: "/historico", label: "Histórico", perm: "history.view" },
-  { href: "/divergencias", label: "Divergências", perm: "reports.view" },
-  { href: "/cancelamentos", label: "Cancelamentos", perm: "reports.view" },
-  { href: "/integracoes", label: "Integrações", perm: "reports.view" },
-  { href: "/auditoria", label: "Auditoria", perm: "audit.view" },
-  { href: "/usuarios", label: "Usuários", perm: "users.manage" },
-  { href: "/configuracoes", label: "Configurações", perm: "settings.manage" },
-  { href: "/assinatura", label: "Assinatura", perm: "settings.manage" },
+];
+const GROUPS: { label: string; items: NavDef[] }[] = [
+  {
+    label: "Relatórios",
+    items: [
+      { href: "/relatorios", label: "Relatório do período", perm: "reports.view" },
+      { href: "/tendencias", label: "Tendências", perm: "reports.view" },
+      { href: "/historico", label: "Histórico de fechamentos", perm: "history.view" },
+      { href: "/divergencias", label: "Divergências", perm: "reports.view" },
+      { href: "/cancelamentos", label: "Cancelamentos", perm: "reports.view" },
+    ],
+  },
+  {
+    label: "Gestão",
+    items: [
+      { href: "/integracoes", label: "Integrações", perm: "reports.view" },
+      { href: "/usuarios", label: "Usuários", perm: "users.manage" },
+      { href: "/configuracoes", label: "Configurações", perm: "settings.manage" },
+      { href: "/assinatura", label: "Assinatura", perm: "settings.manage" },
+      { href: "/auditoria", label: "Auditoria", perm: "audit.view" },
+    ],
+  },
 ];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser({ allowPasswordChange: true, allowTwoFactorSetup: true });
   const blocked = user.mustChangePassword || user.mustSetupTwoFactor;
-  const items = blocked ? [] : NAV.filter((n) => !n.perm || can(user.role, n.perm));
+  const allowed = (n: NavDef) => !n.perm || can(user.role, n.perm);
+  const primary = blocked ? [] : PRIMARY.filter(allowed).map(({ href, label }) => ({ href, label }));
+  const platform = !blocked && (await isPlatformAdmin(user).catch(() => false));
+  const groups = blocked
+    ? []
+    : GROUPS.map((g) => ({
+        label: g.label,
+        items: [...g.items.filter(allowed), ...(g.label === "Gestão" && platform ? [{ href: "/plataforma", label: "Plataforma" }] : [])].map(({ href, label }) => ({ href, label })),
+      }));
   const access = await getAccessState(user.restaurantId).catch(() => null);
   const isAdmin = can(user.role, "settings.manage");
   const units = await listAccessibleUnits(user.userId).catch(() => []);
@@ -53,19 +78,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </form>
           </div>
         </div>
-        {items.length > 0 ? (
-          <nav aria-label="Principal" className="mx-auto max-w-6xl overflow-x-auto px-4">
-            <ul className="flex gap-1 whitespace-nowrap pb-2">
-              {items.map((n) => (
-                <li key={n.href}>
-                  <Link href={n.href} className="inline-block rounded-md px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">
-                    {n.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        ) : null}
+        {primary.length > 0 ? <MainNav primary={primary} groups={groups} /> : null}
       </header>
       {access && access.level !== "full" ? (
         <div role="status" className={`no-print border-b px-4 py-2 text-center text-sm ${access.level === "readonly" ? "border-red-300 bg-red-50 text-red-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}>

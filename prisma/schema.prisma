@@ -78,6 +78,10 @@ model Restaurant {
   billingPlan         BillingPlan @default(TRIAL)
   /// ciclo da assinatura atual (ou da última)
   billingCycle        BillingCycle @default(MONTHLY)
+  /// preço combinado só com este restaurante (ex.: com integração); vazio = preço padrão do sistema
+  customPriceCents       Int?
+  /// plano anual combinado; com mensalidade própria e sem este valor, o restaurante não tem plano anual
+  customAnnualPriceCents Int?
   trialEndsAt         DateTime?
   billingDocument     String?
   billingEmail        String?
