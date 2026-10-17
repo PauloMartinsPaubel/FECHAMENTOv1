@@ -29,6 +29,6 @@ export async function cancelSubscriptionAction(_p: ActionState, _fd: FormData): 
     const actor = await actorFromSession();
     await cancelSubscription(actor);
     revalidatePath("/", "layout");
-    return "Assinatura cancelada. Os dados continuam disponíveis para consulta.";
+    return "Assinatura cancelada. Nenhuma mensalidade nova será cobrada.";
   });
 }

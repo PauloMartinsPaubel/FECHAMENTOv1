@@ -5,10 +5,13 @@
  * - Teste grátis: tudo liberado até o último dia; aviso nos 3 dias finais. Depois, só leitura.
  * - Assinante: em dia, liberado. Cobrança vencendo em até 3 dias: aviso. Atrasada: aviso por 7 dias
  *   (carência) e depois só leitura. Pagou, libera na hora.
- * - Cancelado: só leitura.
+ * - Cancelado: continua liberado até o fim do que já foi pago (ou do teste grátis); depois, só leitura.
+ *   Cancelar só impede as próximas cobranças: ninguém perde dias que pagou.
  * "Só leitura" = não abre caixa novo. Relatórios, histórico e o fechamento de caixa já aberto continuam.
  * Dados nunca são apagados por falta de pagamento.
  */
+import { addDays } from "./dates";
+
 export type BillingPlanCode = "EXEMPT" | "TRIAL" | "SUBSCRIBED" | "CANCELED";
 
 export const GRACE_DAYS = 7;
@@ -39,12 +42,41 @@ export function daysBetween(fromIso: string, toIso: string): number {
 }
 
 const br = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+
+/** Mesmo dia no mês seguinte, como o Asaas faz no ciclo mensal; dia que não existe vira o último (31/01 -> 28/02). */
+export function nextMonthSameDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const ny = m === 12 ? y + 1 : y;
+  const nm = m === 12 ? 1 : m + 1;
+  const last = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
+  return `${ny}-${String(nm).padStart(2, "0")}-${String(Math.min(d, last)).padStart(2, "0")}`;
+}
+
+/**
+ * Último dia já garantido ao restaurante: o fim do teste grátis ou, se for depois, a véspera do vencimento
+ * seguinte à última mensalidade paga (a mensalidade que vence em 31/10 cobre até 29/11).
+ */
+export function coveredUntil(trialEndDate: string | null, payments: { status: string; dueDate: string }[]): string | null {
+  let until = trialEndDate;
+  for (const p of payments) {
+    if (!isPaidStatus(p.status)) continue;
+    const end = addDays(nextMonthSameDay(p.dueDate), -1);
+    if (!until || end > until) until = end;
+  }
+  return until;
+}
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 export function computeAccess(input: AccessInput): AccessState {
   const { plan, today } = input;
   if (plan === "EXEMPT") return { level: "full", reason: "exempt", message: "Restaurante isento de assinatura." };
-  if (plan === "CANCELED") return { level: "readonly", reason: "canceled", message: "Assinatura cancelada. Os dados continuam disponíveis, mas não é possível abrir caixa novo." };
+  if (plan === "CANCELED") {
+    const until = coveredUntil(input.trialEndDate, input.payments);
+    if (until && until >= today) {
+      return { level: "warning", reason: "canceled", message: `Assinatura cancelada. Os caixas continuam liberados até ${br(until)}; depois disso, os dados ficam disponíveis só para consulta.` };
+    }
+    return { level: "readonly", reason: "canceled", message: "Assinatura cancelada. Os dados continuam disponíveis, mas não é possível abrir caixa novo." };
+  }
 
   if (plan === "TRIAL") {
     if (!input.trialEndDate) return { level: "full", reason: "trial", message: "Teste grátis." };

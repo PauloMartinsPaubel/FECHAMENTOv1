@@ -49,6 +49,7 @@ export default async function BillingPage() {
               <p className="text-sm text-stone-700">
                 Mensalidade de <strong>{formatBRL(priceCents!)}</strong> por restaurante.
                 {r.billingPlan === "TRIAL" && r.trialEndsAt ? ` Assinando agora, a primeira cobrança só vence depois do teste grátis (que vai até ${formatDateBR(fromDbDate(r.trialEndsAt))}).` : ""}
+                {r.billingPlan === "CANCELED" && access.level !== "readonly" ? " Assinando de novo agora, a primeira cobrança só vence depois do período que já está liberado." : ""}
                 {" "}A fatura chega por e-mail e pode ser paga por PIX, boleto ou cartão.
               </p>
               <SubscribeForm defaultEmail={user.email} />

@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { addDays, fromDbDate, todayIso, toDbDate } from "@/lib/dates";
-import { cleanCpfCnpj, computeAccess, isPaidStatus, TRIAL_DAYS, type AccessState, type BillingPlanCode } from "@/lib/billing";
+import { cleanCpfCnpj, computeAccess, coveredUntil, isPaidStatus, TRIAL_DAYS, type AccessState, type BillingPlanCode } from "@/lib/billing";
 import { decimalToCents } from "../integrations/shared";
 import { Actor, assertCan } from "../actor";
 import { audit } from "../audit";
@@ -67,14 +67,17 @@ interface AsaasPayment {
 // Estado de acesso
 // ---------------------------------------------------------------------------
 
+const OPEN_OR_PAID = ["PENDING", "OVERDUE", "RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"] as const;
+
 async function accessFor(restaurantId: string, today = todayIso()) {
   const r = await prisma.restaurant.findUniqueOrThrow({
     where: { id: restaurantId },
     select: { billingPlan: true, trialEndsAt: true },
   });
+  // em aberto contam para o assinante; pagas, para saber até quando vai quem cancelou
   const payments =
-    r.billingPlan === "SUBSCRIBED"
-      ? await prisma.billingPayment.findMany({ where: { restaurantId, status: { in: ["PENDING", "OVERDUE"] } }, select: { status: true, dueDate: true } })
+    r.billingPlan === "SUBSCRIBED" || r.billingPlan === "CANCELED"
+      ? await prisma.billingPayment.findMany({ where: { restaurantId, status: { in: [...OPEN_OR_PAID] } }, select: { status: true, dueDate: true } })
       : [];
   return computeAccess({
     plan: r.billingPlan as BillingPlanCode,
@@ -166,8 +169,10 @@ export async function subscribe(actor: Actor, input: { document: string; email: 
     r.asaasCustomerId ??
     (await asaas<{ id: string }>(config, "POST", "/customers", { name: r.name, cpfCnpj: document, email, externalReference: r.id, notificationDisabled: false })).id;
 
-  const trialEnd = r.trialEndsAt ? fromDbDate(r.trialEndsAt) : today;
-  const nextDueDate = trialEnd > today ? addDays(trialEnd, 1) : today;
+  // a primeira cobrança vence depois do que já está garantido (teste grátis ou mês pago antes de cancelar)
+  const paid = await prisma.billingPayment.findMany({ where: { restaurantId: r.id }, select: { status: true, dueDate: true } });
+  const until = coveredUntil(r.trialEndsAt ? fromDbDate(r.trialEndsAt) : null, paid.map((p) => ({ status: p.status, dueDate: fromDbDate(p.dueDate) })));
+  const nextDueDate = until && until >= today ? addDays(until, 1) : today;
   const sub = await asaas<{ id: string }>(config, "POST", "/subscriptions", {
     customer: customerId,
     billingType: "UNDEFINED",

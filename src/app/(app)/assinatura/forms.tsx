@@ -30,7 +30,7 @@ export function SyncForm() {
 export function CancelForm() {
   return (
     <ActionForm action={cancelSubscriptionAction}>
-      <ConfirmSubmit className="btn-secondary text-red-700" message="Cancelar a assinatura? Os dados ficam guardados, mas não será possível abrir caixa novo.">
+      <ConfirmSubmit className="btn-secondary text-red-700" message="Cancelar a assinatura? As próximas mensalidades deixam de ser cobradas. Os caixas continuam liberados até o fim do período já pago (ou do teste grátis); depois disso, os dados ficam guardados só para consulta.">
         Cancelar assinatura
       </ConfirmSubmit>
     </ActionForm>

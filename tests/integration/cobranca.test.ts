@@ -6,7 +6,8 @@ import { prisma } from "@/server/db";
 import { bootstrap, Env } from "./setup";
 import { registerRestaurant } from "@/server/services/signup";
 import { openSession } from "@/server/services/sessions";
-import { cancelSubscription, getAccessState, subscribe, syncBillingPayments } from "@/server/services/billing";
+import { assertCanOpenCash, cancelSubscription, getAccessState, subscribe, syncBillingPayments } from "@/server/services/billing";
+import { nextMonthSameDay } from "@/lib/billing";
 import { POST } from "@/app/api/asaas/webhook/route";
 import { addDays, todayIso } from "@/lib/dates";
 import type { Actor } from "@/server/actor";
@@ -123,7 +124,14 @@ describe("cobrança pelo Asaas", () => {
     expect(await prisma.billingPayment.count({ where: { restaurantId } })).toBe(2);
     await expect(cancelSubscription(env.manager, config())).rejects.toMatchObject({ code: "FORBIDDEN" });
     await cancelSubscription(actor, config());
-    expect((await getAccessState(restaurantId)).reason).toBe("canceled");
+    // a mensalidade paga (vencimento hoje) garante o mês: cancelar não bloqueia na hora
+    const covered = addDays(nextMonthSameDay(today), -1);
+    expect(await getAccessState(restaurantId)).toMatchObject({ reason: "canceled", level: "warning" });
+    expect((await getAccessState(restaurantId)).message).toContain(covered.split("-").reverse().join("/"));
+    await expect(assertCanOpenCash(restaurantId)).resolves.toBeUndefined();
+    // assinar de novo antes do fim do mês pago: a primeira cobrança só vence depois dele
+    const again = await subscribe(actor, { document: "11.222.333/0001-81", email: "financeiro@bistro.com" }, config());
+    expect(again.nextDueDate).toBe(addDays(covered, 1));
     expect(await prisma.auditLog.count({ where: { restaurantId, action: { in: ["billing.subscribe", "billing.cancel", "billing.payment_event"] } } })).toBeGreaterThanOrEqual(4);
   });
 });
